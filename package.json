@@ -1,0 +1,24 @@
+{
+  "name": "crm-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev .",
+    "build": "next build .",
+    "start": "next start .",
+    "lint": "tsc --noEmit -p tsconfig.lint.json",
+    "clean": "rm -rf .next"
+  },
+  "dependencies": {
+    "lucide-react": "^1.7.0",
+    "next": "15.2.4",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "^19.0.5",
+    "typescript": "^5.8.3"
+  }
+}

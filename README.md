@@ -1,31 +1,33 @@
 # crm-platform
 
-This module will host the main web CRM experience.
+Frontend web platform for Smart CRM, built with Next.js.
 
-## Responsibilities
+## Current pages
 
-- staff-facing dashboard
-- lead and client management screens
-- tax workflow pipeline
-- document tracking interface
-- communication timeline
-- reporting views for office operations
+- `/login`
+- `/sign-in`
+- `/dashboard`
+- `/crm`
 
-## UX direction
+## Current structure
 
-The web platform should feel operational and fast. Tax offices need clarity during peak season, so the interface should prioritize:
+- `app/login/page.tsx`: login page
+- `app/sign-in/page.tsx`: sign-in page
+- `app/dashboard/page.tsx`: dashboard with tool cards
+- `app/crm/page.tsx`: CRM workspace
 
-- strong filtering and saved views
-- visible status progression
-- low-friction data entry
-- actionable alerts
-- clear staff ownership per account
+## Run locally
 
-## First implementation targets
+```bash
+npm install
+npm run dev
+```
 
-1. Dashboard for tax workflow statuses.
-2. Lead intake and conversion flow.
-3. Client detail page with timeline and checklist.
-4. Task board for preparer operations.
+## Next product steps
+
+1. Add real authentication.
+2. Connect dashboard metrics to backend data.
+3. Build CRM flows for lead intake and client conversion.
+4. Add document checklist and task management.
 # crm-platform
 # crm-platform
