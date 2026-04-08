@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./crm-shell.module.css";
+import { useAuth } from "../contexts/auth-context";
+import { LogoutButton } from "./auth/logout-button";
+import { createLead as createLeadRequest, getLeads } from "../lib/crm-api";
 
 const pipeline = [
   { stage: "New lead", count: 14 },
@@ -21,6 +24,7 @@ type Lead = {
   phoneNumber: string;
   status: string;
   owner: string;
+  notes?: string;
 };
 
 const initialLeads: Lead[] = [
@@ -61,9 +65,59 @@ const emptyForm = {
 };
 
 export function CrmShell() {
+  const auth = useAuth();
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadForm, setLeadForm] = useState(emptyForm);
+  const [isLoadingLeads, setIsLoadingLeads] = useState(true);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLeads() {
+      if (!auth.isAuthenticated) {
+        return;
+      }
+
+      try {
+        const response = await getLeads();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setLeads(
+          (response.leads as Array<Record<string, unknown>>).map((lead) => ({
+            id: String(lead.id),
+            firstName: String(lead.firstName ?? ""),
+            middleName: String(lead.middleName ?? ""),
+            lastName: String(lead.lastName ?? ""),
+            phoneNumber: String(lead.phoneNumber ?? ""),
+            status: String(lead.status ?? "New lead"),
+            owner: String(lead.ownerId ?? "Unassigned"),
+            notes: typeof lead.notes === "string" ? lead.notes : undefined,
+          }))
+        );
+      } catch (error) {
+        console.error("[crm-shell] failed to load leads:", error);
+
+        if (isMounted) {
+          setFeedbackMessage("We could not load live leads yet. Showing local preview data.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingLeads(false);
+        }
+      }
+    }
+
+    void loadLeads();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [auth.isAuthenticated]);
 
   const orderedLeads = useMemo(
     () =>
@@ -88,27 +142,42 @@ export function CrmShell() {
     setLeadForm(emptyForm);
   }
 
-  function createLead(event: React.FormEvent<HTMLFormElement>) {
+  async function createLead(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!leadForm.firstName.trim() || !leadForm.lastName.trim() || !leadForm.phoneNumber.trim()) {
       return;
     }
 
-    setLeads((current) => [
-      {
-        id: `lead-${crypto.randomUUID()}`,
+    try {
+      const response = await createLeadRequest({
         firstName: leadForm.firstName.trim(),
         middleName: leadForm.middleName.trim(),
         lastName: leadForm.lastName.trim(),
         phoneNumber: leadForm.phoneNumber.trim(),
-        status: "New lead",
-        owner: "Unassigned",
-      },
-      ...current,
-    ]);
+      });
 
-    closeLeadModal();
+      const createdLead = response.lead as Record<string, unknown>;
+
+      setLeads((current) => [
+        {
+          id: String(createdLead.id),
+          firstName: String(createdLead.firstName ?? ""),
+          middleName: String(createdLead.middleName ?? ""),
+          lastName: String(createdLead.lastName ?? ""),
+          phoneNumber: String(createdLead.phoneNumber ?? ""),
+          status: String(createdLead.status ?? "New lead"),
+          owner: "Unassigned",
+        },
+        ...current,
+      ]);
+
+      setFeedbackMessage("Lead created successfully.");
+      closeLeadModal();
+    } catch (error) {
+      console.error("[crm-shell] failed to create lead:", error);
+      setFeedbackMessage("We could not save this lead in the API yet.");
+    }
   }
 
   return (
@@ -121,6 +190,9 @@ export function CrmShell() {
             <p className={styles.copy}>
               Track the tax workflow from first contact through filing readiness.
             </p>
+            <p className={styles.copy}>
+              Signed in as {auth.user?.email ?? auth.user?.firstName ?? "office user"}.
+            </p>
           </div>
 
           <div className={styles.actions}>
@@ -128,6 +200,7 @@ export function CrmShell() {
             <Link href="/crm/tasks" className={styles.toolsButton}>
               Open workflow board
             </Link>
+            <LogoutButton />
             <button type="button" onClick={openLeadModal}>
               New lead
             </button>
@@ -150,8 +223,10 @@ export function CrmShell() {
                 <h2>Lead Queue</h2>
                 <p className={styles.cardSubtitle}>Recent inbound leads and priority follow-up.</p>
               </div>
-              <span>{orderedLeads.length} records</span>
+              <span>{isLoadingLeads ? "Loading..." : `${orderedLeads.length} records`}</span>
             </div>
+
+            {feedbackMessage ? <p className={styles.cardSubtitle}>{feedbackMessage}</p> : null}
 
             <div className={styles.table}>
               <div className={styles.tableHead}>

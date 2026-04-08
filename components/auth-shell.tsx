@@ -1,12 +1,13 @@
 import Link from "next/link";
 import styles from "./auth-shell.module.css";
+import { AuthForm } from "./auth-form";
 
 interface AuthShellProps {
+  mode: "login" | "sign-up" | "reset-password";
   eyebrow: string;
   title: string;
   description: string;
   ctaLabel: string;
-  ctaHref: string;
   secondaryLabel: string;
   secondaryHref: string;
 }
@@ -48,25 +49,12 @@ export function AuthShell(props: AuthShellProps) {
             <span>Smart CRM</span>
             <Link href="/dashboard">Preview dashboard</Link>
           </div>
-
-          <label className={styles.field}>
-            <span>Email</span>
-            <input type="email" placeholder="office@smarttax.com" />
-          </label>
-
-          <label className={styles.field}>
-            <span>Password</span>
-            <input type="password" placeholder="Enter your password" />
-          </label>
-
-          <button className={styles.primaryButton} type="button">
-            {props.ctaLabel}
-          </button>
-
-          <div className={styles.linksRow}>
-            <Link href={props.secondaryHref}>{props.secondaryLabel}</Link>
-            <Link href={props.ctaHref}>Continue to dashboard</Link>
-          </div>
+          <AuthForm
+            mode={props.mode}
+            ctaLabel={props.ctaLabel}
+            secondaryLabel={props.secondaryLabel}
+            secondaryHref={props.secondaryHref}
+          />
         </div>
       </section>
     </main>

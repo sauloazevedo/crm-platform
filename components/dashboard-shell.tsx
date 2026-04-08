@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import styles from "./dashboard-shell.module.css";
+import { LogoutButton } from "./auth/logout-button";
+import { ThemeToggle } from "./theme-toggle";
+import { useAuth } from "../contexts/auth-context";
 
 const tools = [
   {
@@ -29,6 +34,12 @@ const tools = [
 ];
 
 export function DashboardShell() {
+  const auth = useAuth();
+  const displayName =
+    auth.user?.firstName ??
+    auth.user?.email ??
+    "Office user";
+
   return (
     <main className={styles.page}>
       <aside className={styles.sidebar}>
@@ -43,7 +54,7 @@ export function DashboardShell() {
         <nav className={styles.nav}>
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/crm">CRM</Link>
-          <Link href="/login">Logout</Link>
+          <LogoutButton className={styles.logoutButton} />
         </nav>
       </aside>
 
@@ -52,8 +63,12 @@ export function DashboardShell() {
           <div>
             <p className={styles.headerEyebrow}>Today&apos;s pulse</p>
             <h2>Tools</h2>
+            <p className={styles.userLine}>Signed in as {displayName}</p>
           </div>
-          <div className={styles.statusBadge}>Peak Season Mode</div>
+          <div className={styles.headerActions}>
+            <ThemeToggle />
+            <div className={styles.statusBadge}>Peak Season Mode</div>
+          </div>
         </header>
 
         <section className={styles.metrics}>
