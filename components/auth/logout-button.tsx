@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { useAuth } from "../../contexts/auth-context";
+import { useAuth } from "../../contexts/AuthContext";
 
 export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
@@ -15,7 +15,7 @@ export function LogoutButton({ className }: { className?: string }) {
       className={className}
       onClick={() =>
         startTransition(async () => {
-          await auth.logout();
+          await auth.signOut();
           router.replace("/login");
           router.refresh();
         })

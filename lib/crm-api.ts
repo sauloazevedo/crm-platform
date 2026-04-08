@@ -1,4 +1,4 @@
-import { fetchAuthSession } from "aws-amplify/auth";
+import { getAuthHeaders } from "./authHeaders";
 
 function getApiBaseUrl(): string {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -8,28 +8,6 @@ function getApiBaseUrl(): string {
   }
 
   return apiBaseUrl.replace(/\/$/, "");
-}
-
-async function buildHeaders() {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken;
-  const accessToken = session.tokens?.accessToken?.toString();
-  const idTokenString = idToken?.toString();
-  const idTokenPayload = idToken?.payload as Record<string, unknown> | undefined;
-  const sub = typeof idTokenPayload?.sub === "string" ? idTokenPayload.sub : undefined;
-  const sessionToken =
-    typeof idTokenPayload?.["custom:session_token"] === "string"
-      ? idTokenPayload["custom:session_token"]
-      : undefined;
-
-  return {
-    "Content-Type": "application/json",
-    ...(idTokenString || accessToken
-      ? { Authorization: `Bearer ${idTokenString ?? accessToken}` }
-      : {}),
-    ...(sub ? { "x-user-sub": sub } : {}),
-    ...(sessionToken ? { "x-session-token": sessionToken } : {}),
-  };
 }
 
 export type CreateLeadInput = {
@@ -46,9 +24,11 @@ export type CreateLeadInput = {
 };
 
 export async function getLeads() {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
   const response = await fetch(`${getApiBaseUrl()}/leads`, {
     method: "GET",
-    headers: await buildHeaders(),
+    headers: headers ?? { "Content-Type": "application/json" },
   });
 
   if (!response.ok) {
@@ -59,9 +39,11 @@ export async function getLeads() {
 }
 
 export async function createLead(input: CreateLeadInput) {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
   const response = await fetch(`${getApiBaseUrl()}/leads`, {
     method: "POST",
-    headers: await buildHeaders(),
+    headers: headers ?? { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
 

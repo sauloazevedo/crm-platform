@@ -3,14 +3,13 @@ export type AmplifyAuthRuntimeConfig = {
   userPoolClientId: string;
 };
 
-function readEnv(name: string): string | undefined {
-  const value = process.env[name];
+function normalizeEnvValue(value: string | undefined): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
 export function getAmplifyAuthRuntimeConfig(): AmplifyAuthRuntimeConfig | null {
-  const userPoolId = readEnv("NEXT_PUBLIC_COGNITO_USER_POOL_ID");
-  const userPoolClientId = readEnv("NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID");
+  const userPoolId = normalizeEnvValue(process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID);
+  const userPoolClientId = normalizeEnvValue(process.env.NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID);
 
   if (!userPoolId || !userPoolClientId) {
     return null;

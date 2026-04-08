@@ -3,14 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import {
-  confirmResetPassword,
-  resetPassword,
-  signIn,
-  signUp,
-} from "aws-amplify/auth";
 import styles from "./auth-shell.module.css";
-import { useAuth } from "../contexts/auth-context";
+import { useAuth } from "../contexts/AuthContext";
+import { handleConfirmResetPassword } from "../services/auth";
 
 type AuthMode = "login" | "sign-up" | "reset-password";
 
@@ -99,12 +94,7 @@ export function AuthForm(props: AuthFormProps) {
     startTransition(async () => {
       try {
         if (props.mode === "login") {
-          await signIn({
-            username: email.trim(),
-            password,
-          });
-
-          await auth.refreshSession();
+          await auth.signIn(email.trim(), password);
           router.push("/dashboard");
           router.refresh();
           return;
@@ -121,17 +111,7 @@ export function AuthForm(props: AuthFormProps) {
             return;
           }
 
-          await signUp({
-            username: email.trim(),
-            password,
-            options: {
-              userAttributes: {
-                email: email.trim(),
-                given_name: firstName.trim(),
-                family_name: lastName.trim(),
-              },
-            },
-          });
+          await auth.signUp(email.trim(), password, firstName.trim(), lastName.trim());
 
           setSuccessMessage("Account created. You can log in now.");
           router.push("/login");
@@ -139,9 +119,7 @@ export function AuthForm(props: AuthFormProps) {
         }
 
         if (!isConfirmStep) {
-          await resetPassword({
-            username: email.trim(),
-          });
+          await auth.resetPassword(email.trim());
 
           setIsConfirmStep(true);
           setSuccessMessage("Verification code sent. Enter the code and your new password.");
@@ -153,11 +131,7 @@ export function AuthForm(props: AuthFormProps) {
           return;
         }
 
-        await confirmResetPassword({
-          username: email.trim(),
-          confirmationCode: verificationCode.trim(),
-          newPassword: password,
-        });
+        await handleConfirmResetPassword(email.trim(), verificationCode.trim(), password);
 
         setSuccessMessage("Password updated. You can log in now.");
         router.push("/login");

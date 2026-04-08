@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./crm-shell.module.css";
-import { useAuth } from "../contexts/auth-context";
+import { useAuth } from "../contexts/AuthContext";
 import { LogoutButton } from "./auth/logout-button";
 import { createLead as createLeadRequest, getLeads } from "../lib/crm-api";
 

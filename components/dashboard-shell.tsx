@@ -4,7 +4,7 @@ import Link from "next/link";
 import styles from "./dashboard-shell.module.css";
 import { LogoutButton } from "./auth/logout-button";
 import { ThemeToggle } from "./theme-toggle";
-import { useAuth } from "../contexts/auth-context";
+import { useAuth } from "../contexts/AuthContext";
 
 const tools = [
   {
