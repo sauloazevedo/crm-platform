@@ -1,4 +1,5 @@
 import {
+  confirmSignUp,
   confirmResetPassword,
   resetPassword,
   signIn,
@@ -24,6 +25,13 @@ export const handleSignUp = async (email: string, password: string, firstName?: 
         ...(lastName ? { family_name: lastName } : {}),
       },
     },
+  });
+};
+
+export const handleConfirmSignUp = async (email: string, confirmationCode: string) => {
+  return confirmSignUp({
+    username: email,
+    confirmationCode,
   });
 };
 

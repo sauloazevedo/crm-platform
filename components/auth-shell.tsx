@@ -1,4 +1,3 @@
-import Link from "next/link";
 import styles from "./auth-shell.module.css";
 import { AuthForm } from "./auth-form";
 
@@ -47,7 +46,6 @@ export function AuthShell(props: AuthShellProps) {
         <div className={styles.formCard}>
           <div className={styles.formHeader}>
             <span>Smart CRM</span>
-            <Link href="/dashboard">Preview dashboard</Link>
           </div>
           <AuthForm
             mode={props.mode}

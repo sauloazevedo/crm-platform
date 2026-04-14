@@ -1,11 +1,12 @@
 "use client";
 
+import { Check, Eye, EyeOff, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import styles from "./auth-shell.module.css";
 import { useAuth } from "../contexts/AuthContext";
-import { handleConfirmResetPassword } from "../services/auth";
+import { handleConfirmResetPassword, handleConfirmSignUp } from "../services/auth";
 
 type AuthMode = "login" | "sign-up" | "reset-password";
 
@@ -15,6 +16,47 @@ type AuthFormProps = {
   secondaryLabel: string;
   secondaryHref: string;
 };
+
+const passwordRules = [
+  {
+    label: "At least 8 characters",
+    test: (value: string) => value.length >= 8,
+  },
+  {
+    label: "At least 1 uppercase letter",
+    test: (value: string) => /[A-Z]/.test(value),
+  },
+  {
+    label: "At least 1 lowercase letter",
+    test: (value: string) => /[a-z]/.test(value),
+  },
+  {
+    label: "At least 1 number",
+    test: (value: string) => /\d/.test(value),
+  },
+];
+
+function isPasswordValid(password: string) {
+  return passwordRules.every((rule) => rule.test(password));
+}
+
+function PasswordRules({ password }: { password: string }) {
+  return (
+    <div className={styles.passwordRules}>
+      <h3>Password requirements</h3>
+      {passwordRules.map((rule) => {
+        const isValid = rule.test(password);
+
+        return (
+          <p key={rule.label} className={isValid ? styles.passwordRuleValid : styles.passwordRuleInvalid}>
+            {isValid ? <Check size={15} /> : <X size={15} />}
+            <span>{rule.label}</span>
+          </p>
+        );
+      })}
+    </div>
+  );
+}
 
 function getFriendlyError(error: unknown): string {
   if (typeof error === "object" && error && "name" in error) {
@@ -56,7 +98,7 @@ export function AuthForm(props: AuthFormProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
@@ -81,8 +123,16 @@ export function AuthForm(props: AuthFormProps) {
     setErrorMessage(null);
   }
 
+  function trimTextInputs() {
+    setEmail((value) => value.trim());
+    setFirstName((value) => value.trim());
+    setLastName((value) => value.trim());
+    setVerificationCode((value) => value.trim());
+  }
+
   function handleSubmit() {
     clearFeedback();
+    trimTextInputs();
 
     if (!auth.isConfigured) {
       setErrorMessage(
@@ -93,25 +143,48 @@ export function AuthForm(props: AuthFormProps) {
 
     startTransition(async () => {
       try {
+        const cleanedEmail = email.trim();
+        const cleanedFirstName = firstName.trim();
+        const cleanedLastName = lastName.trim();
+        const cleanedVerificationCode = verificationCode.trim();
+
         if (props.mode === "login") {
-          await auth.signIn(email.trim(), password);
+          await auth.signIn(cleanedEmail, password);
           router.push("/dashboard");
           router.refresh();
           return;
         }
 
         if (props.mode === "sign-up") {
-          if (!firstName.trim() || !lastName.trim()) {
+          if (isConfirmStep) {
+            if (!cleanedVerificationCode) {
+              setErrorMessage("Confirmation code is required.");
+              return;
+            }
+
+            await handleConfirmSignUp(cleanedEmail, cleanedVerificationCode);
+            setSuccessMessage("Account confirmed. You can log in now.");
+            router.push("/login");
+            return;
+          }
+
+          if (!cleanedFirstName || !cleanedLastName) {
             setErrorMessage("First name and last name are required.");
             return;
           }
 
-          if (password !== confirmPassword) {
-            setErrorMessage("Passwords do not match.");
+          if (!isPasswordValid(password)) {
+            setErrorMessage("Password requirements are not complete yet.");
             return;
           }
 
-          await auth.signUp(email.trim(), password, firstName.trim(), lastName.trim());
+          const result = await auth.signUp(cleanedEmail, password, cleanedFirstName, cleanedLastName);
+
+          if (result.nextStep.signUpStep === "CONFIRM_SIGN_UP") {
+            setIsConfirmStep(true);
+            setSuccessMessage(`We sent a confirmation code to ${cleanedEmail}.`);
+            return;
+          }
 
           setSuccessMessage("Account created. You can log in now.");
           router.push("/login");
@@ -119,19 +192,24 @@ export function AuthForm(props: AuthFormProps) {
         }
 
         if (!isConfirmStep) {
-          await auth.resetPassword(email.trim());
+          await auth.resetPassword(cleanedEmail);
 
           setIsConfirmStep(true);
           setSuccessMessage("Verification code sent. Enter the code and your new password.");
           return;
         }
 
-        if (password !== confirmPassword) {
-          setErrorMessage("Passwords do not match.");
+        if (!isPasswordValid(password)) {
+          setErrorMessage("Password requirements are not complete yet.");
           return;
         }
 
-        await handleConfirmResetPassword(email.trim(), verificationCode.trim(), password);
+        if (!cleanedVerificationCode) {
+          setErrorMessage("Verification code is required.");
+          return;
+        }
+
+        await handleConfirmResetPassword(cleanedEmail, cleanedVerificationCode, password);
 
         setSuccessMessage("Password updated. You can log in now.");
         router.push("/login");
@@ -145,16 +223,24 @@ export function AuthForm(props: AuthFormProps) {
     <>
       {isMounted && !auth.isConfigured ? <p className={styles.notice}>{helperMessage}</p> : null}
 
-      {props.mode === "sign-up" ? (
+      {props.mode === "sign-up" && !isConfirmStep ? (
         <>
           <label className={styles.field}>
             <span>First name</span>
-            <input value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+            <input
+              value={firstName}
+              onBlur={() => setFirstName((value) => value.trim())}
+              onChange={(event) => setFirstName(event.target.value)}
+            />
           </label>
 
           <label className={styles.field}>
             <span>Last name</span>
-            <input value={lastName} onChange={(event) => setLastName(event.target.value)} />
+            <input
+              value={lastName}
+              onBlur={() => setLastName((value) => value.trim())}
+              onChange={(event) => setLastName(event.target.value)}
+            />
           </label>
         </>
       ) : null}
@@ -165,45 +251,47 @@ export function AuthForm(props: AuthFormProps) {
           type="email"
           placeholder="office@smarttax.com"
           value={email}
+          onBlur={() => setEmail((value) => value.trim())}
           onChange={(event) => setEmail(event.target.value)}
         />
       </label>
 
-      {props.mode === "reset-password" && isConfirmStep ? (
+      {isConfirmStep ? (
         <label className={styles.field}>
-          <span>Verification code</span>
+          <span>{props.mode === "sign-up" ? "Confirmation code" : "Verification code"}</span>
           <input
             type="text"
             placeholder="Enter the code from your email"
             value={verificationCode}
+            onBlur={() => setVerificationCode((value) => value.trim())}
             onChange={(event) => setVerificationCode(event.target.value)}
           />
         </label>
       ) : null}
 
-      {props.mode !== "reset-password" || isConfirmStep ? (
+      {(props.mode === "login" || (props.mode === "sign-up" && !isConfirmStep) || (props.mode === "reset-password" && isConfirmStep)) ? (
         <>
           <label className={styles.field}>
             <span>{props.mode === "reset-password" ? "New password" : "Password"}</span>
-            <input
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
+            <div className={styles.passwordInputWrap}>
+              <input
+                type={isPasswordVisible ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button
+                type="button"
+                className={styles.passwordVisibilityButton}
+                onClick={() => setIsPasswordVisible((current) => !current)}
+                aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+              >
+                {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </label>
 
-          {props.mode !== "login" ? (
-            <label className={styles.field}>
-              <span>Confirm password</span>
-              <input
-                type="password"
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-              />
-            </label>
-          ) : null}
+          {props.mode !== "login" ? <PasswordRules password={password} /> : null}
         </>
       ) : null}
 
@@ -216,7 +304,13 @@ export function AuthForm(props: AuthFormProps) {
         onClick={handleSubmit}
         disabled={isPending}
       >
-        {isPending ? "Working..." : props.ctaLabel}
+        {isPending
+          ? "Working..."
+          : props.mode === "sign-up" && isConfirmStep
+            ? "Confirm account"
+            : props.mode === "reset-password" && isConfirmStep
+              ? "Reset password"
+              : props.ctaLabel}
       </button>
 
       <div className={styles.linksRow}>

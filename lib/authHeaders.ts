@@ -2,7 +2,6 @@ import { fetchAuthSession } from "aws-amplify/auth";
 
 export type AuthHeaders = {
   Authorization?: string;
-  "x-user-sub": string;
   "x-session-token": string;
 };
 
@@ -11,12 +10,6 @@ export async function getAuthHeaders(
 ): Promise<(AuthHeaders & { "Content-Type"?: string }) | null> {
   const session = await fetchAuthSession();
   const idTokenPayload = session.tokens?.idToken?.payload;
-  const accessTokenPayload = session.tokens?.accessToken?.payload;
-
-  const sub =
-    session.userSub ||
-    (typeof idTokenPayload?.sub === "string" ? idTokenPayload.sub : undefined) ||
-    (typeof accessTokenPayload?.sub === "string" ? accessTokenPayload.sub : undefined);
 
   const sessionToken =
     typeof idTokenPayload?.["custom:session_token"] === "string"
@@ -25,7 +18,7 @@ export async function getAuthHeaders(
   const idToken = session.tokens?.idToken?.toString();
   const accessToken = session.tokens?.accessToken?.toString();
 
-  if (!sub || !sessionToken) {
+  if (!sessionToken) {
     return null;
   }
 
@@ -34,7 +27,6 @@ export async function getAuthHeaders(
         ...(idToken || accessToken
           ? { Authorization: `Bearer ${idToken ?? accessToken}` }
           : {}),
-        "x-user-sub": sub,
         "x-session-token": sessionToken,
         "Content-Type": "application/json",
       }
@@ -42,7 +34,6 @@ export async function getAuthHeaders(
         ...(idToken || accessToken
           ? { Authorization: `Bearer ${idToken ?? accessToken}` }
           : {}),
-        "x-user-sub": sub,
         "x-session-token": sessionToken,
       };
 }

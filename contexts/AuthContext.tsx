@@ -12,6 +12,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getAmplifyAuthRuntimeConfig } from "../lib/amplify-auth-config";
+import { getCurrentUserProfile } from "../lib/crm-api";
 import { handleResetPassword, handleSignIn, handleSignOut, handleSignUp } from "../services/auth";
 
 export type SessionUser = {
@@ -20,6 +21,7 @@ export type SessionUser = {
   email?: string;
   firstName?: string;
   lastName?: string;
+  role?: string;
   sessionToken?: string;
   idToken?: string;
   accessToken?: string;
@@ -85,6 +87,15 @@ function mapUser(user: AuthUser, idTokenPayload?: Record<string, unknown>): Sess
   };
 }
 
+function isUnauthenticatedError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: string }).name === "UserUnAuthenticatedException"
+  );
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [userSession, setUserSession] = useState<Awaited<ReturnType<typeof fetchAuthSession>> | null>(null);
@@ -102,17 +113,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const [session, currentUser] = await Promise.all([fetchAuthSession(), getCurrentUser()]);
-      const payload = session.tokens?.idToken?.payload as Record<string, unknown> | undefined;
+      const session = await fetchAuthSession();
 
-      setUserSession(session);
-      setUser({
+      if (!session.tokens) {
+        setUser(null);
+        setUserSession(null);
+        return;
+      }
+
+      const currentUser = await getCurrentUser();
+      const payload = session.tokens?.idToken?.payload as Record<string, unknown> | undefined;
+      const mappedUser = {
         ...mapUser(currentUser, payload),
         idToken: session.tokens?.idToken?.toString(),
         accessToken: session.tokens?.accessToken?.toString(),
+      };
+
+      if (!mappedUser.sessionToken) {
+        console.warn("[AuthContext] missing custom:session_token claim.");
+        setUser(null);
+        setUserSession(null);
+        return;
+      }
+
+      const userProfile = mappedUser.sessionToken
+        ? await getCurrentUserProfile().catch((error) => {
+            console.warn("[AuthContext] user profile error:", error);
+            return null;
+          })
+        : null;
+
+      if (!userProfile?.user) {
+        setUser(null);
+        setUserSession(null);
+        return;
+      }
+
+      setUserSession(session);
+      setUser({
+        ...mappedUser,
+        email: userProfile?.user.email ?? mappedUser.email,
+        firstName: userProfile?.user.firstName ?? mappedUser.firstName,
+        lastName: userProfile?.user.lastName ?? mappedUser.lastName,
+        role: userProfile?.user.role ?? mappedUser.role,
       });
     } catch (error) {
-      console.error("[AuthContext] check session error:", error);
+      if (!isUnauthenticatedError(error)) {
+        console.error("[AuthContext] check session error:", error);
+      }
+
       setUser(null);
       setUserSession(null);
     } finally {

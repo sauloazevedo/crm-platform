@@ -23,6 +23,33 @@ export type CreateLeadInput = {
   notes?: string;
 };
 
+export type CurrentUserProfile = {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+};
+
+export async function getCurrentUserProfile(): Promise<{ user: CurrentUserProfile }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  if (!headers) {
+    throw new Error("Missing authenticated user token.");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/users/me`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch current user: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function getLeads() {
   const headers = await getAuthHeaders({ includeJsonContentType: true });
 

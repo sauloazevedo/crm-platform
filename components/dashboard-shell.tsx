@@ -35,10 +35,8 @@ const tools = [
 
 export function DashboardShell() {
   const auth = useAuth();
-  const displayName =
-    auth.user?.firstName ??
-    auth.user?.email ??
-    "Office user";
+  // console.log(auth);
+  const displayName = auth.user?.firstName ?? auth.user?.email ?? "Office user";
 
   return (
     <main className={styles.page}>

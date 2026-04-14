@@ -112,7 +112,7 @@
 
 .formHeader {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   margin-bottom: 28px;
   font-size: 0.95rem;
@@ -120,10 +120,6 @@
 
 .formHeader span {
   font-weight: 700;
-}
-
-.formHeader a {
-  color: var(--accent-cool);
 }
 
 .field {
@@ -148,6 +144,79 @@
 
 .field input::placeholder {
   color: rgba(145, 166, 192, 0.72);
+}
+
+.passwordInputWrap {
+  position: relative;
+}
+
+.passwordInputWrap input {
+  padding-right: 48px;
+}
+
+.passwordVisibilityButton {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.passwordVisibilityButton:hover {
+  color: var(--accent-cool);
+  background: rgba(75, 242, 226, 0.08);
+}
+
+.passwordRules {
+  display: grid;
+  gap: 9px;
+  margin: -4px 0 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-muted) 72%, transparent);
+}
+
+.passwordRules h3 {
+  margin: 0 0 2px;
+  font-size: 0.84rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.passwordRules p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.passwordRules svg {
+  flex: 0 0 auto;
+}
+
+.passwordRuleValid {
+  color: var(--accent-cool);
+}
+
+.passwordRuleInvalid {
+  color: var(--muted);
+}
+
+.passwordRuleInvalid svg {
+  color: var(--accent-strong);
 }
 
 .notice,
