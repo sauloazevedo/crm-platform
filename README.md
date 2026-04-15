@@ -15,6 +15,13 @@ Smart CRM is a workspace for a CRM tailored to the tax preparer universe. The co
 - deployment flow: GitHub -> AWS Amplify
 - current status: active development
 
+Required public environment variables:
+
+- `NEXT_PUBLIC_API_BASE_URL`
+- `NEXT_PUBLIC_COGNITO_USER_POOL_ID`
+- `NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID`
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` for address autocomplete on lead and company address fields.
+
 ### `crm-IaC`
 
 - purpose: backend, infrastructure as code, and platform automation

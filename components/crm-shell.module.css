@@ -382,7 +382,8 @@
 .field input,
 .field select,
 .fieldWide select,
-.fieldFull input {
+.fieldFull input,
+.addressAutocomplete input {
   min-height: 48px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
@@ -393,6 +394,63 @@
 
 .copyInputWrap {
   position: relative;
+}
+
+.addressAutocomplete {
+  position: relative;
+  width: 100%;
+  min-width: 100%;
+}
+
+.addressAutocomplete input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fieldFull .addressAutocomplete,
+.companyFull .addressAutocomplete {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.addressSuggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: grid;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid rgba(75, 242, 226, 0.22);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-strong) 94%, #011c40);
+  box-shadow: var(--shadow);
+}
+
+.addressSuggestions button,
+.addressSuggestions span {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+
+.addressSuggestions button {
+  cursor: pointer;
+}
+
+.addressSuggestions button:hover {
+  background: rgba(75, 242, 226, 0.1);
+}
+
+.addressSuggestions span {
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .copyInputWrap input {

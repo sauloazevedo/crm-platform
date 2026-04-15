@@ -15,6 +15,7 @@ import {
   type UpdateLeadInput,
 } from "../lib/crm-api";
 import { LeadResources } from "./lead-resources";
+import { AddressAutocomplete } from "./address-autocomplete";
 import { ThemeToggle } from "./theme-toggle";
 import styles from "./leads-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
@@ -482,10 +483,10 @@ export function LeadsShell() {
 
                   <label className={crmStyles.fieldFull}>
                     <span>Address</span>
-                    <input
-                      value={editorForm.address}
+                    <AddressAutocomplete
+                      value={editorForm.address ?? ""}
                       onBlur={() => setEditorForm((current) => ({ ...current, address: current.address?.trim() }))}
-                      onChange={(event) => setEditorForm((current) => ({ ...current, address: event.target.value }))}
+                      onChange={(address) => setEditorForm((current) => ({ ...current, address }))}
                       placeholder="Address"
                     />
                   </label>

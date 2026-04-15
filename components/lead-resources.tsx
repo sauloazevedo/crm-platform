@@ -13,6 +13,7 @@ import {
   type LeadCompanyRecord,
   type LeadFileRecord,
 } from "../lib/crm-api";
+import { AddressAutocomplete } from "./address-autocomplete";
 import styles from "./crm-shell.module.css";
 
 const entityTypeOptions = [
@@ -352,7 +353,11 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
                     <label className={styles.companyFull}>
                       <span>Principal Address</span>
                       <div className={styles.copyInputWrap}>
-                        <input value={company.principalAddress ?? ""} onChange={(event) => updateCompany(company.id, { principalAddress: event.target.value })} placeholder="Principal Address" />
+                        <AddressAutocomplete
+                          value={company.principalAddress ?? ""}
+                          onChange={(principalAddress) => updateCompany(company.id, { principalAddress })}
+                          placeholder="Principal Address"
+                        />
                         <button type="button" onClick={() => copyCompanyAddress(company.principalAddress)} aria-label="Copy principal address">
                           <Copy size={17} />
                         </button>
@@ -361,7 +366,11 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
                     <label className={styles.companyFull}>
                       <span>Mailing Address</span>
                       <div className={styles.copyInputWrap}>
-                        <input value={company.mailingAddress ?? ""} onChange={(event) => updateCompany(company.id, { mailingAddress: event.target.value })} placeholder="Mailing Address" />
+                        <AddressAutocomplete
+                          value={company.mailingAddress ?? ""}
+                          onChange={(mailingAddress) => updateCompany(company.id, { mailingAddress })}
+                          placeholder="Mailing Address"
+                        />
                         <button type="button" onClick={() => copyCompanyAddress(company.mailingAddress)} aria-label="Copy mailing address">
                           <Copy size={17} />
                         </button>

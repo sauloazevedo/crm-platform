@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Copy } from "lucide-react";
 import styles from "./crm-shell.module.css";
+import { AddressAutocomplete } from "./address-autocomplete";
 import { useAuth } from "../contexts/AuthContext";
 import { LogoutButton } from "./auth/logout-button";
 import { LeadResources } from "./lead-resources";
@@ -577,12 +578,10 @@ export function CrmShell() {
 
                   <label className={styles.fieldFull}>
                     <span>Address</span>
-                    <input
+                    <AddressAutocomplete
                       value={leadForm.address}
                       onBlur={() => setLeadForm((current) => ({ ...current, address: current.address.trim() }))}
-                      onChange={(event) =>
-                        setLeadForm((current) => ({ ...current, address: event.target.value }))
-                      }
+                      onChange={(address) => setLeadForm((current) => ({ ...current, address }))}
                       placeholder="Address"
                     />
                   </label>
