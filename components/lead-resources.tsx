@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, FileText, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, FileText, Plus, Trash2 } from "lucide-react";
 import {
   createLeadCompany,
   createLeadFile,
@@ -120,6 +120,7 @@ async function fileToBase64(file: File) {
 export function LeadResources({ leadId, companies, files, onCompaniesChange, onFilesChange }: Props) {
   const [resourceMessage, setResourceMessage] = useState<string | null>(null);
   const [partnerDrafts, setPartnerDrafts] = useState<Record<string, string>>({});
+  const [collapsedCompanies, setCollapsedCompanies] = useState<Record<string, boolean>>({});
 
   async function addCompany() {
     setResourceMessage(null);
@@ -219,6 +220,10 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
     });
   }
 
+  function toggleCompany(companyId: string) {
+    setCollapsedCompanies((current) => ({ ...current, [companyId]: !current[companyId] }));
+  }
+
   async function addFile(event: React.ChangeEvent<HTMLInputElement>) {
     setResourceMessage(null);
     const file = event.target.files?.[0];
@@ -310,13 +315,14 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
           {companies.map((company) => (
             <article key={company.id} className={styles.companyCard}>
               <div className={styles.companyHeader}>
-                <select
-                  aria-label="Company selector"
-                  value={company.companyName}
-                  onChange={(event) => updateCompany(company.id, { companyName: event.target.value.trim() || "New company" })}
+                <button
+                  type="button"
+                  className={styles.companyToggleButton}
+                  onClick={() => toggleCompany(company.id)}
+                  aria-label={collapsedCompanies[company.id] ? "Open company details" : "Close company details"}
                 >
-                  <option>{company.companyName}</option>
-                </select>
+                  {collapsedCompanies[company.id] ? <ChevronRight size={19} /> : <ChevronDown size={19} />}
+                </button>
                 <input
                   value={company.companyName}
                   onBlur={(event) => updateCompany(company.id, { companyName: event.target.value.trim() || "New company" })}
@@ -328,85 +334,89 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
                 </button>
               </div>
 
-              <div className={styles.companyGrid}>
-                <label>
-                  <span>EIN</span>
-                  <input value={company.ein ?? ""} onChange={(event) => updateCompany(company.id, { ein: event.target.value })} placeholder="EIN" />
-                </label>
-                <label>
-                  <span>Filing Date</span>
-                  <input type="date" value={formatDate(company.filingDate)} onChange={(event) => updateCompany(company.id, { filingDate: event.target.value })} />
-                </label>
-                <label>
-                  <span>Company</span>
-                  <input value={company.companyName} onChange={(event) => updateCompany(company.id, { companyName: event.target.value })} placeholder="Company" />
-                </label>
-                <label className={styles.companyFull}>
-                  <span>Principal Address</span>
-                  <div className={styles.copyInputWrap}>
-                    <input value={company.principalAddress ?? ""} onChange={(event) => updateCompany(company.id, { principalAddress: event.target.value })} placeholder="Principal Address" />
-                    <button type="button" onClick={() => copyCompanyAddress(company.principalAddress)} aria-label="Copy principal address">
-                      <Copy size={17} />
-                    </button>
+              {!collapsedCompanies[company.id] ? (
+                <>
+                  <div className={styles.companyGrid}>
+                    <label>
+                      <span>EIN</span>
+                      <input value={company.ein ?? ""} onChange={(event) => updateCompany(company.id, { ein: event.target.value })} placeholder="EIN" />
+                    </label>
+                    <label>
+                      <span>Filing Date</span>
+                      <input type="date" value={formatDate(company.filingDate)} onChange={(event) => updateCompany(company.id, { filingDate: event.target.value })} />
+                    </label>
+                    <label>
+                      <span>Company</span>
+                      <input value={company.companyName} onChange={(event) => updateCompany(company.id, { companyName: event.target.value })} placeholder="Company" />
+                    </label>
+                    <label className={styles.companyFull}>
+                      <span>Principal Address</span>
+                      <div className={styles.copyInputWrap}>
+                        <input value={company.principalAddress ?? ""} onChange={(event) => updateCompany(company.id, { principalAddress: event.target.value })} placeholder="Principal Address" />
+                        <button type="button" onClick={() => copyCompanyAddress(company.principalAddress)} aria-label="Copy principal address">
+                          <Copy size={17} />
+                        </button>
+                      </div>
+                    </label>
+                    <label className={styles.companyFull}>
+                      <span>Mailing Address</span>
+                      <div className={styles.copyInputWrap}>
+                        <input value={company.mailingAddress ?? ""} onChange={(event) => updateCompany(company.id, { mailingAddress: event.target.value })} placeholder="Mailing Address" />
+                        <button type="button" onClick={() => copyCompanyAddress(company.mailingAddress)} aria-label="Copy mailing address">
+                          <Copy size={17} />
+                        </button>
+                      </div>
+                    </label>
+                    <label>
+                      <span>Type of Entity</span>
+                      <select value={company.entityType ?? entityTypeOptions[0]} onChange={(event) => updateCompany(company.id, { entityType: event.target.value })}>
+                        {entityTypeOptions.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Business Type</span>
+                      <select value={company.businessType ?? businessTypeOptions[0]} onChange={(event) => updateCompany(company.id, { businessType: event.target.value })}>
+                        {businessTypeOptions.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Other (Specify)</span>
+                      <input value={company.otherDescription ?? ""} onChange={(event) => updateCompany(company.id, { otherDescription: event.target.value })} placeholder="Other" />
+                    </label>
                   </div>
-                </label>
-                <label className={styles.companyFull}>
-                  <span>Mailing Address</span>
-                  <div className={styles.copyInputWrap}>
-                    <input value={company.mailingAddress ?? ""} onChange={(event) => updateCompany(company.id, { mailingAddress: event.target.value })} placeholder="Mailing Address" />
-                    <button type="button" onClick={() => copyCompanyAddress(company.mailingAddress)} aria-label="Copy mailing address">
-                      <Copy size={17} />
-                    </button>
-                  </div>
-                </label>
-                <label>
-                  <span>Type of Entity</span>
-                  <select value={company.entityType ?? entityTypeOptions[0]} onChange={(event) => updateCompany(company.id, { entityType: event.target.value })}>
-                    {entityTypeOptions.map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Business Type</span>
-                  <select value={company.businessType ?? businessTypeOptions[0]} onChange={(event) => updateCompany(company.id, { businessType: event.target.value })}>
-                    {businessTypeOptions.map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Other (Specify)</span>
-                  <input value={company.otherDescription ?? ""} onChange={(event) => updateCompany(company.id, { otherDescription: event.target.value })} placeholder="Other" />
-                </label>
-              </div>
 
-              <div className={styles.partnersBlock}>
-                <h4>Partners</h4>
-                <div className={styles.partnerInputRow}>
-                  <input
-                    value={partnerDrafts[company.id] ?? ""}
-                    onBlur={(event) =>
-                      setPartnerDrafts((current) => ({ ...current, [company.id]: event.target.value.trim() }))
-                    }
-                    onChange={(event) =>
-                      setPartnerDrafts((current) => ({ ...current, [company.id]: event.target.value }))
-                    }
-                    placeholder="Select clients"
-                  />
-                  <button type="button" onClick={() => addPartner(company.id)}>
-                    Add
-                  </button>
-                </div>
-                {getPartnerValues(company.partners).map((partner, index) => (
-                  <span key={`${partner}-${index}`}>
-                    {partner}
-                    <button type="button" onClick={() => removePartner(company.id, index)} aria-label={`Remove ${partner}`}>
-                      <Trash2 size={15} />
-                    </button>
-                  </span>
-                ))}
-              </div>
+                  <div className={styles.partnersBlock}>
+                    <h4>Partners</h4>
+                    <div className={styles.partnerInputRow}>
+                      <input
+                        value={partnerDrafts[company.id] ?? ""}
+                        onBlur={(event) =>
+                          setPartnerDrafts((current) => ({ ...current, [company.id]: event.target.value.trim() }))
+                        }
+                        onChange={(event) =>
+                          setPartnerDrafts((current) => ({ ...current, [company.id]: event.target.value }))
+                        }
+                        placeholder="Select clients"
+                      />
+                      <button type="button" onClick={() => addPartner(company.id)}>
+                        Add
+                      </button>
+                    </div>
+                    {getPartnerValues(company.partners).map((partner, index) => (
+                      <span key={`${partner}-${index}`}>
+                        {partner}
+                        <button type="button" onClick={() => removePartner(company.id, index)} aria-label={`Remove ${partner}`}>
+                          <Trash2 size={15} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </article>
           ))}
 

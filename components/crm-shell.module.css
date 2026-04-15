@@ -520,7 +520,6 @@
   align-items: center;
 }
 
-.companyHeader select,
 .companyHeader input,
 .companyGrid input,
 .companyGrid select,
@@ -533,11 +532,6 @@
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
   padding: 12px 14px;
-}
-
-.companyHeader select {
-  padding: 0;
-  text-align: center;
 }
 
 .companyGrid {
