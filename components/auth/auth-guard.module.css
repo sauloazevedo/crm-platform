@@ -1,0 +1,39 @@
+.loadingPage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.loadingCard {
+  width: min(100%, 420px);
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.loadingCard span {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 16px;
+  border: 3px solid rgba(75, 242, 226, 0.18);
+  border-top-color: var(--accent-cool);
+  border-radius: 50%;
+  animation: spin 850ms linear infinite;
+}
+
+.loadingCard p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

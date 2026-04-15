@@ -35,7 +35,7 @@ const tools = [
 
 export function DashboardShell() {
   const auth = useAuth();
-  // console.log(auth);
+  console.log(auth);
   const displayName = auth.user?.firstName ?? auth.user?.email ?? "Office user";
 
   return (
@@ -51,6 +51,8 @@ export function DashboardShell() {
 
         <nav className={styles.nav}>
           <Link href="/dashboard">Dashboard</Link>
+          <Link href="/profile">Profile</Link>
+          <Link href="/leads">Leads</Link>
           <Link href="/crm">CRM</Link>
           <LogoutButton className={styles.logoutButton} />
         </nav>

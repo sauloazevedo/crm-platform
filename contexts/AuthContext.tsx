@@ -44,6 +44,20 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 let isAmplifyConfigured = false;
+const AUTH_TIMEOUT_MS = 9000;
+
+function withTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error(message));
+    }, AUTH_TIMEOUT_MS);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => window.clearTimeout(timeout));
+  });
+}
 
 function configureAmplify() {
   if (isAmplifyConfigured) {
@@ -104,6 +118,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const isConfigured = Boolean(getAmplifyAuthRuntimeConfig());
 
+  function rejectSession(message: string, error?: unknown) {
+    if (error) {
+      console.warn(`[AuthContext] ${message}`, error);
+    } else {
+      console.warn(`[AuthContext] ${message}`);
+    }
+
+    if (isConfigured) {
+      void handleSignOut().catch((signOutError) => {
+        console.warn("[AuthContext] failed to sign out invalid session:", signOutError);
+      });
+    }
+
+    setUser(null);
+    setUserSession(null);
+  }
+
   async function refreshSession() {
     if (!isConfigured) {
       setUser(null);
@@ -113,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const session = await fetchAuthSession();
+      let session = await withTimeout(fetchAuthSession(), "Session check timed out.");
 
       if (!session.tokens) {
         setUser(null);
@@ -121,31 +152,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const currentUser = await getCurrentUser();
-      const payload = session.tokens?.idToken?.payload as Record<string, unknown> | undefined;
-      const mappedUser = {
+      let currentUser = await withTimeout(getCurrentUser(), "Current user check timed out.");
+      let payload = session.tokens?.idToken?.payload as Record<string, unknown> | undefined;
+      let mappedUser = {
         ...mapUser(currentUser, payload),
         idToken: session.tokens?.idToken?.toString(),
         accessToken: session.tokens?.accessToken?.toString(),
       };
 
       if (!mappedUser.sessionToken) {
-        console.warn("[AuthContext] missing custom:session_token claim.");
-        setUser(null);
-        setUserSession(null);
-        return;
+        session = await withTimeout(
+          fetchAuthSession({ forceRefresh: true }),
+          "Forced session refresh timed out."
+        );
+
+        if (!session.tokens) {
+          setUser(null);
+          setUserSession(null);
+          return;
+        }
+
+        currentUser = await withTimeout(getCurrentUser(), "Current user check timed out.");
+        payload = session.tokens?.idToken?.payload as Record<string, unknown> | undefined;
+        mappedUser = {
+          ...mapUser(currentUser, payload),
+          idToken: session.tokens?.idToken?.toString(),
+          accessToken: session.tokens?.accessToken?.toString(),
+        };
+
+        if (!mappedUser.sessionToken) {
+          rejectSession("missing custom:session_token claim after forced refresh.");
+          return;
+        }
       }
 
-      const userProfile = mappedUser.sessionToken
-        ? await getCurrentUserProfile().catch((error) => {
-            console.warn("[AuthContext] user profile error:", error);
-            return null;
-          })
-        : null;
+      const controller = new AbortController();
+      const profileTimeout = window.setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
+
+      const userProfile = await getCurrentUserProfile({
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${mappedUser.idToken ?? mappedUser.accessToken ?? ""}`,
+          "Content-Type": "application/json",
+          "x-session-token": mappedUser.sessionToken,
+        },
+      })
+        .catch((error) => {
+          rejectSession("user profile validation failed.", error);
+          return null;
+        })
+        .finally(() => window.clearTimeout(profileTimeout));
 
       if (!userProfile?.user) {
-        setUser(null);
-        setUserSession(null);
         return;
       }
 
@@ -175,13 +233,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    let isActive = true;
+    const safetyTimer = window.setTimeout(() => {
+      if (!isActive) {
+        return;
+      }
+
+      console.warn("[AuthContext] initial session bootstrap timed out.");
+      setUser(null);
+      setUserSession(null);
+      setIsLoading(false);
+    }, AUTH_TIMEOUT_MS + 2000);
+
     if (!isConfigured) {
       setIsLoading(false);
+      window.clearTimeout(safetyTimer);
       return;
     }
 
     configureAmplify();
-    void checkUser();
+    void checkUser().finally(() => {
+      window.clearTimeout(safetyTimer);
+    });
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(safetyTimer);
+    };
   }, [isConfigured]);
 
   useEffect(() => {
@@ -244,7 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [isConfigured, isLoading, user, userSession]
   );
 
-  return <AuthContext.Provider value={value}>{!isLoading ? children : null}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

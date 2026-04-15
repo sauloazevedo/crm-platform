@@ -180,14 +180,16 @@
   z-index: 30;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 20px;
   background: rgba(1, 13, 24, 0.72);
   backdrop-filter: blur(10px);
 }
 
 .modalCard {
-  width: min(100%, 560px);
-  padding: 24px;
+  width: min(100%, 1180px);
+  max-height: calc(100vh - 40px);
+  padding: 28px;
+  overflow: auto;
   border-radius: 7px;
   background: var(--surface-strong);
   border: 1px solid rgba(75, 242, 226, 0.14);
@@ -238,24 +240,410 @@
 
 .modalForm {
   display: grid;
-  gap: 16px;
+  gap: 20px;
 }
 
-.field {
+.intakeSection {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 24px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-muted) 68%, transparent);
+}
+
+.avatarPreview {
+  width: 126px;
+  height: 126px;
+  align-self: start;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+  border-radius: 7px;
+  border: 1px solid rgba(75, 242, 226, 0.22);
+  background:
+    radial-gradient(circle at top, rgba(75, 242, 226, 0.22), transparent 56%),
+    var(--panel);
+  color: var(--accent-cool);
+  font-size: 3.4rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.avatarPreview input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.avatarPreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarPreview small {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  background: rgba(1, 28, 64, 0.78);
+  color: #eef6ff;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: none;
+  font-weight: 700;
+}
+
+.intakeGrid,
+.contactGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.intakeGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.contactGrid {
+  grid-template-columns: 0.8fr 1.8fr;
+}
+
+.intakeSectionStack,
+.collapsedSection {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-muted) 68%, transparent);
+}
+
+.intakeSectionStack h3,
+.collapsedSection h3 {
+  margin: 0 0 16px;
+  color: var(--text);
+  font-size: 1.45rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.collapsedSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+
+.collapsedSection p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.collapsedSection button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1.7rem;
+  font-weight: 900;
+}
+
+.field,
+.fieldWide,
+.fieldFull {
   display: grid;
   gap: 8px;
 }
 
-.field span {
+.fieldWide {
+  grid-column: span 2;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.field span,
+.fieldWide span,
+.fieldFull span {
   font-size: 0.92rem;
   color: var(--muted);
 }
 
-.field input {
+.field input,
+.field select,
+.fieldWide select,
+.fieldFull input {
+  min-height: 48px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
   padding: 14px 16px;
+  border-radius: 7px;
+}
+
+.copyInputWrap {
+  position: relative;
+}
+
+.copyInputWrap input {
+  width: 100%;
+  padding-right: 50px;
+}
+
+.copyInputWrap button {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(75, 242, 226, 0.1);
+  color: var(--accent-cool);
+  cursor: pointer;
+}
+
+.copyInputWrap button:hover {
+  background: rgba(75, 242, 226, 0.18);
+}
+
+.copyFeedback {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.field select,
+.fieldWide select {
+  appearance: none;
+}
+
+.taskLogPreview {
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+  padding: 16px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.filePreview {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filePreview button {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.fileHint {
+  margin: 14px 0 0;
+  color: var(--muted);
+}
+
+.resourceMessage {
+  margin: -4px 0 16px;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.sectionTitleRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.sectionTitleRow h3 {
+  margin: 0;
+}
+
+.sectionTitleRow button,
+.companyHeader button,
+.fileRow button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.companyStack {
+  display: grid;
+  gap: 18px;
+}
+
+.companyCard {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  border: 1px solid var(--line);
+}
+
+.companyHeader {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.companyHeader select,
+.companyHeader input,
+.companyGrid input,
+.companyGrid select,
+.partnersBlock input,
+.partnersBlock button,
+.fileRow input {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 12px 14px;
+}
+
+.companyHeader select {
+  padding: 0;
+  text-align: center;
+}
+
+.companyGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.companyGrid label,
+.partnersBlock {
+  display: grid;
+  gap: 7px;
+}
+
+.companyGrid span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.companyFull {
+  grid-column: 1 / -1;
+}
+
+.partnersBlock h4 {
+  margin: 10px 0 0;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+}
+
+.partnersBlock span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-muted) 76%, transparent);
+}
+
+.partnersBlock span button {
+  min-height: 32px;
+  width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.partnerInputRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+}
+
+.partnerInputRow button {
+  background: color-mix(in srgb, var(--accent-cool) 72%, var(--accent));
+  color: #011c40;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.uploadButton {
+  min-height: 42px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.uploadButton input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.filesList {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.fileRow {
+  display: grid;
+  grid-template-columns: 1fr 220px 44px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+}
+
+.fileRow span {
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 .modalActions {
@@ -295,6 +683,27 @@
   .modalHeader,
   .modalActions {
     flex-direction: column;
+  }
+
+  .modalCard {
+    width: 100%;
+    max-height: calc(100vh - 40px);
+    border-radius: 7px;
+  }
+
+  .intakeSection,
+  .intakeGrid,
+  .contactGrid,
+  .taskLogPreview,
+  .companyGrid,
+  .companyHeader,
+  .partnerInputRow,
+  .fileRow {
+    grid-template-columns: 1fr;
+  }
+
+  .fieldWide {
+    grid-column: auto;
   }
 
   .pipelineSection,

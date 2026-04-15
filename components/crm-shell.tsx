@@ -2,10 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Copy } from "lucide-react";
 import styles from "./crm-shell.module.css";
 import { useAuth } from "../contexts/AuthContext";
 import { LogoutButton } from "./auth/logout-button";
-import { createLead as createLeadRequest, getLeads } from "../lib/crm-api";
+import { LeadResources } from "./lead-resources";
+import {
+  createLead as createLeadRequest,
+  createLeadCompany,
+  createLeadFile,
+  getLeads,
+  type LeadCompanyRecord,
+  type LeadFileRecord,
+} from "../lib/crm-api";
 
 const pipeline = [
   { stage: "New lead", count: 14 },
@@ -21,7 +30,13 @@ type Lead = {
   firstName: string;
   middleName: string;
   lastName: string;
+  dateOfBirth?: string;
+  taxId?: string;
+  taxIdLast4?: string;
+  gender?: string;
   phoneNumber: string;
+  email?: string;
+  address?: string;
   status: string;
   owner: string;
   notes?: string;
@@ -61,7 +76,17 @@ const emptyForm = {
   firstName: "",
   middleName: "",
   lastName: "",
+  leadPhotoDataUrl: "",
+  dateOfBirth: "",
+  taxId: "",
+  gender: "Male",
   phoneNumber: "",
+  email: "",
+  address: "",
+  source: "Users",
+  serviceInterest: "Tax preparation",
+  preferredLanguage: "English",
+  notes: "",
 };
 
 export function CrmShell() {
@@ -69,8 +94,12 @@ export function CrmShell() {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadForm, setLeadForm] = useState(emptyForm);
+  const [leadCompanies, setLeadCompanies] = useState<LeadCompanyRecord[]>([]);
+  const [leadFiles, setLeadFiles] = useState<Array<LeadFileRecord & { fileDataBase64?: string }>>([]);
   const [isLoadingLeads, setIsLoadingLeads] = useState(true);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -93,7 +122,13 @@ export function CrmShell() {
             firstName: String(lead.firstName ?? ""),
             middleName: String(lead.middleName ?? ""),
             lastName: String(lead.lastName ?? ""),
+            dateOfBirth: String(lead.dateOfBirth ?? ""),
+            taxId: String(lead.taxId ?? ""),
+            taxIdLast4: String(lead.taxIdLast4 ?? ""),
+            gender: String(lead.gender ?? ""),
             phoneNumber: String(lead.phoneNumber ?? ""),
+            email: String(lead.email ?? ""),
+            address: String(lead.address ?? ""),
             status: String(lead.status ?? "New lead"),
             owner: String(lead.ownerId ?? "Unassigned"),
             notes: typeof lead.notes === "string" ? lead.notes : undefined,
@@ -140,6 +175,8 @@ export function CrmShell() {
   function closeLeadModal() {
     setIsLeadModalOpen(false);
     setLeadForm(emptyForm);
+    setLeadCompanies([]);
+    setLeadFiles([]);
   }
 
   async function createLead(event: React.FormEvent<HTMLFormElement>) {
@@ -154,18 +191,63 @@ export function CrmShell() {
         firstName: leadForm.firstName.trim(),
         middleName: leadForm.middleName.trim(),
         lastName: leadForm.lastName.trim(),
+        leadPhotoDataUrl: leadForm.leadPhotoDataUrl,
+        dateOfBirth: leadForm.dateOfBirth.trim(),
+        taxId: leadForm.taxId.trim(),
+        gender: leadForm.gender.trim(),
         phoneNumber: leadForm.phoneNumber.trim(),
+        email: leadForm.email.trim(),
+        address: leadForm.address.trim(),
+        source: leadForm.source.trim(),
+        serviceInterest: leadForm.serviceInterest.trim(),
+        preferredLanguage: leadForm.preferredLanguage.trim(),
+        notes: leadForm.notes.trim(),
       });
 
       const createdLead = response.lead as Record<string, unknown>;
+      const createdLeadId = String(createdLead.id);
+
+      await Promise.all([
+        ...leadCompanies.map((company) =>
+          createLeadCompany(createdLeadId, {
+            companyName: company.companyName,
+            ein: company.ein ?? "",
+            filingDate: company.filingDate ?? "",
+            principalAddress: company.principalAddress ?? "",
+            mailingAddress: company.mailingAddress ?? "",
+            entityType: company.entityType ?? "",
+            businessType: company.businessType ?? "",
+            otherDescription: company.otherDescription ?? "",
+            partners: company.partners ?? {},
+          })
+        ),
+        ...leadFiles
+          .filter((file) => file.fileDataBase64)
+          .map((file) =>
+            createLeadFile(createdLeadId, {
+              fileName: file.fileName,
+              originalFileName: file.originalFileName ?? "",
+              contentType: file.contentType ?? "",
+              fileSize: file.fileSize ?? undefined,
+              fileDataBase64: file.fileDataBase64 ?? "",
+            })
+          ),
+      ]);
 
       setLeads((current) => [
         {
-          id: String(createdLead.id),
+          id: createdLeadId,
           firstName: String(createdLead.firstName ?? ""),
           middleName: String(createdLead.middleName ?? ""),
           lastName: String(createdLead.lastName ?? ""),
+          leadPhotoDataUrl: String(createdLead.leadPhotoDataUrl ?? ""),
+          dateOfBirth: String(createdLead.dateOfBirth ?? ""),
+          taxId: String(createdLead.taxId ?? ""),
+          taxIdLast4: String(createdLead.taxIdLast4 ?? ""),
+          gender: String(createdLead.gender ?? ""),
           phoneNumber: String(createdLead.phoneNumber ?? ""),
+          email: String(createdLead.email ?? ""),
+          address: String(createdLead.address ?? ""),
           status: String(createdLead.status ?? "New lead"),
           owner: "Unassigned",
         },
@@ -178,6 +260,63 @@ export function CrmShell() {
       console.error("[crm-shell] failed to create lead:", error);
       setFeedbackMessage("We could not save this lead in the API yet.");
     }
+  }
+
+  function formatTaxId(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 9);
+    const first = digits.slice(0, 3);
+    const second = digits.slice(3, 5);
+    const third = digits.slice(5, 9);
+
+    return [first, second, third].filter(Boolean).join("-");
+  }
+
+  async function copyTaxId() {
+    if (!leadForm.taxId) {
+      setCopyFeedback("Add a Tax ID before copying.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(leadForm.taxId);
+      setCopyFeedback("Tax ID copied.");
+    } catch (error) {
+      console.warn("[crm-shell] failed to copy tax id:", error);
+      setCopyFeedback("We could not copy the Tax ID.");
+    }
+  }
+
+  function handleLeadPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setPhotoFeedback("Choose an image file.");
+      return;
+    }
+
+    if (file.size > 1_000_000) {
+      setPhotoFeedback("Use an image smaller than 1 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+
+      setLeadForm((current) => ({ ...current, leadPhotoDataUrl: result }));
+      setPhotoFeedback("Lead photo ready.");
+    };
+
+    reader.onerror = () => {
+      setPhotoFeedback("We could not read this image.");
+    };
+
+    reader.readAsDataURL(file);
   }
 
   return (
@@ -268,7 +407,7 @@ export function CrmShell() {
 
       {isLeadModalOpen ? (
         <div className={styles.modalOverlay} onClick={closeLeadModal}>
-          <div
+          <aside
             className={styles.modalCard}
             onClick={(event) => event.stopPropagation()}
             role="dialog"
@@ -286,49 +425,186 @@ export function CrmShell() {
             </div>
 
             <form className={styles.modalForm} onSubmit={createLead}>
-              <label className={styles.field}>
-                <span>First name</span>
-                <input
-                  value={leadForm.firstName}
-                  onChange={(event) =>
-                    setLeadForm((current) => ({ ...current, firstName: event.target.value }))
-                  }
-                  placeholder="First name"
-                />
-              </label>
+              <section className={styles.intakeSection}>
+                <label className={styles.avatarPreview}>
+                  <input type="file" accept="image/*" onChange={handleLeadPhotoChange} />
+                  {leadForm.leadPhotoDataUrl ? (
+                    <img src={leadForm.leadPhotoDataUrl} alt="Lead preview" />
+                  ) : (
+                    <span>{leadForm.firstName.slice(0, 1) || "L"}</span>
+                  )}
+                  <small>{photoFeedback ?? "Click to add photo"}</small>
+                </label>
 
-              <label className={styles.field}>
-                <span>Middle name</span>
-                <input
-                  value={leadForm.middleName}
-                  onChange={(event) =>
-                    setLeadForm((current) => ({ ...current, middleName: event.target.value }))
-                  }
-                  placeholder="Middle name"
-                />
-              </label>
+                <div className={styles.intakeGrid}>
+                  <label className={styles.field}>
+                    <span>First name</span>
+                    <input
+                      value={leadForm.firstName}
+                      onBlur={() =>
+                        setLeadForm((current) => ({ ...current, firstName: current.firstName.trim() }))
+                      }
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, firstName: event.target.value }))
+                      }
+                      placeholder="First name"
+                    />
+                  </label>
 
-              <label className={styles.field}>
-                <span>Last name</span>
-                <input
-                  value={leadForm.lastName}
-                  onChange={(event) =>
-                    setLeadForm((current) => ({ ...current, lastName: event.target.value }))
-                  }
-                  placeholder="Last name"
-                />
-              </label>
+                  <label className={styles.field}>
+                    <span>Middle name</span>
+                    <input
+                      value={leadForm.middleName}
+                      onBlur={() =>
+                        setLeadForm((current) => ({ ...current, middleName: current.middleName.trim() }))
+                      }
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, middleName: event.target.value }))
+                      }
+                      placeholder="Middle name"
+                    />
+                  </label>
 
-              <label className={styles.field}>
-                <span>Phone number</span>
-                <input
-                  value={leadForm.phoneNumber}
-                  onChange={(event) =>
-                    setLeadForm((current) => ({ ...current, phoneNumber: event.target.value }))
-                  }
-                  placeholder="(000) 000-0000"
-                />
-              </label>
+                  <label className={styles.field}>
+                    <span>Last name</span>
+                    <input
+                      value={leadForm.lastName}
+                      onBlur={() =>
+                        setLeadForm((current) => ({ ...current, lastName: current.lastName.trim() }))
+                      }
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, lastName: event.target.value }))
+                      }
+                      placeholder="Last name"
+                    />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span>Date of birth</span>
+                    <input
+                      type="date"
+                      value={leadForm.dateOfBirth}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, dateOfBirth: event.target.value }))
+                      }
+                    />
+                  </label>
+
+                  <div className={styles.field}>
+                    <span>Tax ID</span>
+                    <div className={styles.copyInputWrap}>
+                      <input
+                        inputMode="numeric"
+                        maxLength={11}
+                        value={leadForm.taxId}
+                        onChange={(event) =>
+                          setLeadForm((current) => ({
+                            ...current,
+                            taxId: formatTaxId(event.target.value),
+                          }))
+                        }
+                        placeholder="xxx-xx-xxxx"
+                      />
+                      <button type="button" onClick={copyTaxId} aria-label="Copy Tax ID">
+                        <Copy size={17} />
+                      </button>
+                    </div>
+                    {copyFeedback ? <small className={styles.copyFeedback}>{copyFeedback}</small> : null}
+                  </div>
+
+                  <label className={styles.field}>
+                    <span>Lead source</span>
+                    <select
+                      value={leadForm.source}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, source: event.target.value }))
+                      }
+                    >
+                      <option>Users</option>
+                      <option>Referral</option>
+                      <option>Walk-in</option>
+                      <option>Website</option>
+                      <option>Phone call</option>
+                    </select>
+                  </label>
+
+                  <label className={styles.fieldWide}>
+                    <span>Gender</span>
+                    <select
+                      value={leadForm.gender}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, gender: event.target.value }))
+                      }
+                    >
+                      <option>Male</option>
+                      <option>Female</option>
+                      <option>Other</option>
+                      <option>Prefer not to say</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
+
+              <section className={styles.intakeSectionStack}>
+                <h3>Contact</h3>
+                <div className={styles.contactGrid}>
+                  <label className={styles.field}>
+                    <span>Phone number</span>
+                    <input
+                      value={leadForm.phoneNumber}
+                      onBlur={() =>
+                        setLeadForm((current) => ({ ...current, phoneNumber: current.phoneNumber.trim() }))
+                      }
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, phoneNumber: event.target.value }))
+                      }
+                      placeholder="(000) 000-0000"
+                    />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span>Email</span>
+                    <input
+                      type="email"
+                      value={leadForm.email}
+                      onBlur={() => setLeadForm((current) => ({ ...current, email: current.email.trim() }))}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, email: event.target.value }))
+                      }
+                      placeholder="client@email.com"
+                    />
+                  </label>
+
+                  <label className={styles.fieldFull}>
+                    <span>Address</span>
+                    <input
+                      value={leadForm.address}
+                      onBlur={() => setLeadForm((current) => ({ ...current, address: current.address.trim() }))}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, address: event.target.value }))
+                      }
+                      placeholder="Address"
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <LeadResources
+                companies={leadCompanies}
+                files={leadFiles}
+                onCompaniesChange={setLeadCompanies}
+                onFilesChange={setLeadFiles}
+              />
+
+              <section className={styles.intakeSectionStack}>
+                <h3>Task log</h3>
+                <div className={styles.taskLogPreview}>
+                  <span>Task Name</span>
+                  <span>Start Date</span>
+                  <span>Modified Date</span>
+                  <span>Status</span>
+                </div>
+              </section>
 
               <div className={styles.modalActions}>
                 <button type="button" className={styles.secondaryModalButton} onClick={closeLeadModal}>
@@ -339,7 +615,7 @@ export function CrmShell() {
                 </button>
               </div>
             </form>
-          </div>
+          </aside>
         </div>
       ) : null}
     </>
