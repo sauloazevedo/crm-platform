@@ -95,12 +95,12 @@ export function AddressAutocomplete({
   const [placesLibrary, setPlacesLibrary] = useState<any>(null);
   const autocompleteServiceRef = useRef<any>(null);
   const sessionTokenRef = useRef<any>(null);
+  const hasUserEditedRef = useRef(false);
 
-  const canSearch = useMemo(() => Boolean(apiKey && placesLibrary && value.trim().length >= 3), [
-    apiKey,
-    placesLibrary,
-    value,
-  ]);
+  const canSearch = useMemo(
+    () => Boolean(hasUserEditedRef.current && apiKey && placesLibrary && value.trim().length >= 3),
+    [apiKey, placesLibrary, value]
+  );
 
   useEffect(() => {
     if (!apiKey) {
@@ -247,11 +247,12 @@ export function AddressAutocomplete({
           onBlur?.();
         }}
         onChange={(event) => {
+          hasUserEditedRef.current = true;
           onChange(event.target.value);
           setIsOpen(true);
         }}
         onFocus={() => {
-          if (suggestions.length > 0) {
+          if (hasUserEditedRef.current && suggestions.length > 0) {
             setIsOpen(true);
           }
         }}

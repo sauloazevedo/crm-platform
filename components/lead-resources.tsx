@@ -40,6 +40,8 @@ const businessTypeOptions = [
   "Other",
 ];
 
+const allowedLeadFileTypes = ["application/pdf", "image/jpeg", "image/png"];
+
 const emptyCompany: LeadCompanyInput = {
   companyName: "",
   ein: "",
@@ -230,6 +232,18 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
     const file = event.target.files?.[0];
 
     if (!file) {
+      return;
+    }
+
+    if (!allowedLeadFileTypes.includes(file.type)) {
+      setResourceMessage("Upload only PDF, JPG, or PNG files.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 5_000_000) {
+      setResourceMessage("Upload files smaller than 5 MB.");
+      event.target.value = "";
       return;
     }
 
@@ -438,7 +452,7 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
         <div className={styles.filePreview}>
           <label className={styles.uploadButton}>
             Click to upload a file
-            <input type="file" onChange={addFile} />
+            <input type="file" accept="application/pdf,image/jpeg,image/png" onChange={addFile} />
           </label>
           <button type="button" aria-label="File upload helper">
             <FileText size={17} />

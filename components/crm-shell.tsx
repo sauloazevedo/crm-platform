@@ -294,13 +294,14 @@ export function CrmShell() {
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
-      setPhotoFeedback("Choose an image file.");
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setPhotoFeedback("Use a JPG or PNG image.");
       return;
     }
 
-    if (file.size > 1_000_000) {
-      setPhotoFeedback("Use an image smaller than 1 MB.");
+    if (file.size > 300_000) {
+      setPhotoFeedback("Use an image smaller than 300 KB.");
+      event.target.value = "";
       return;
     }
 
@@ -311,10 +312,12 @@ export function CrmShell() {
 
       setLeadForm((current) => ({ ...current, leadPhotoDataUrl: result }));
       setPhotoFeedback("Lead photo ready.");
+      event.target.value = "";
     };
 
     reader.onerror = () => {
       setPhotoFeedback("We could not read this image.");
+      event.target.value = "";
     };
 
     reader.readAsDataURL(file);
@@ -434,7 +437,7 @@ export function CrmShell() {
                   ) : (
                     <span>{leadForm.firstName.slice(0, 1) || "L"}</span>
                   )}
-                  <small>{photoFeedback ?? "Click to add photo"}</small>
+                  <small>{photoFeedback ?? "Click to add photo"} JPG/PNG, max 300 KB.</small>
                 </label>
 
                 <div className={styles.intakeGrid}>
