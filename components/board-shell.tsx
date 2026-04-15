@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Pencil, Trash2, X, Check } from "lucide-react";
+import { getTaskBoard, saveTaskBoard } from "../lib/crm-api";
 import styles from "./board-shell.module.css";
 
 type Task = {
@@ -58,6 +59,8 @@ export function BoardShell() {
   const [lanes, setLanes] = useState<Lane[]>(initialLanes);
   const [newLaneTitle, setNewLaneTitle] = useState("");
   const [laneDrafts, setLaneDrafts] = useState<Record<string, DraftTask>>({});
+  const [isLoadingBoard, setIsLoadingBoard] = useState(true);
+  const [boardMessage, setBoardMessage] = useState<string | null>(null);
   const [draggedLaneId, setDraggedLaneId] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<{
     laneId: string;
@@ -69,6 +72,59 @@ export function BoardShell() {
     title: string;
     notes: string;
   } | null>(null);
+  const hasLoadedBoardRef = useRef(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadBoard() {
+      try {
+        const response = await getTaskBoard();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setLanes(response.lanes.length > 0 ? response.lanes : initialLanes);
+        setBoardMessage(null);
+      } catch (error) {
+        console.warn("[BoardShell] failed to load task board:", error);
+
+        if (isMounted) {
+          setBoardMessage("We could not load the saved task board yet. Showing local starter lanes.");
+        }
+      } finally {
+        if (isMounted) {
+          hasLoadedBoardRef.current = true;
+          setIsLoadingBoard(false);
+        }
+      }
+    }
+
+    void loadBoard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedBoardRef.current || isLoadingBoard) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        await saveTaskBoard(lanes);
+        setBoardMessage("Task board saved.");
+      } catch (error) {
+        console.warn("[BoardShell] failed to save task board:", error);
+        setBoardMessage("We could not save the task board changes yet.");
+      }
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isLoadingBoard, lanes]);
 
   function addLane() {
     const title = newLaneTitle.trim();
@@ -260,6 +316,7 @@ export function BoardShell() {
             Organize o fluxo operacional em colunas tipo Trello. Crie esteiras, mova a ordem delas
             e gerencie tasks por etapa.
           </p>
+          <p className={styles.copy}>{isLoadingBoard ? "Loading saved board..." : boardMessage}</p>
         </div>
 
         <div className={styles.headerActions}>

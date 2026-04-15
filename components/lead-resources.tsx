@@ -14,6 +14,7 @@ import {
   type LeadFileRecord,
 } from "../lib/crm-api";
 import { AddressAutocomplete } from "./address-autocomplete";
+import { compressImageFile, isCompressibleImage } from "../lib/image-compression";
 import styles from "./crm-shell.module.css";
 
 const entityTypeOptions = [
@@ -247,8 +248,33 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
       return;
     }
 
-    const fileDataBase64 = await fileToBase64(file);
+    let fileDataBase64 = "";
+    let contentType = file.type;
+    let fileSize = file.size;
     const draftName = file.name.replace(/\.[^.]+$/, "") || file.name;
+
+    try {
+      if (isCompressibleImage(file)) {
+        setResourceMessage("Optimizing image before upload...");
+        const compressed = await compressImageFile(file, {
+          maxBytes: 5_000_000,
+          maxDimension: 1800,
+          initialQuality: 0.86,
+          minQuality: 0.58,
+        });
+
+        fileDataBase64 = compressed.base64;
+        contentType = compressed.contentType;
+        fileSize = compressed.size;
+      } else {
+        fileDataBase64 = await fileToBase64(file);
+      }
+    } catch (error) {
+      console.warn("[LeadResources] failed to prepare file upload:", error);
+      setResourceMessage("We could not prepare this file for upload.");
+      event.target.value = "";
+      return;
+    }
 
     if (!leadId) {
       onFilesChange([
@@ -257,8 +283,8 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
           leadId: "draft",
           fileName: draftName,
           originalFileName: file.name,
-          contentType: file.type,
-          fileSize: file.size,
+          contentType,
+          fileSize,
           uploadedAt: new Date().toISOString(),
           fileDataBase64,
         },
@@ -272,8 +298,8 @@ export function LeadResources({ leadId, companies, files, onCompaniesChange, onF
       const response = await createLeadFile(leadId, {
         fileName: draftName,
         originalFileName: file.name,
-        contentType: file.type,
-        fileSize: file.size,
+        contentType,
+        fileSize,
         fileDataBase64,
       });
 

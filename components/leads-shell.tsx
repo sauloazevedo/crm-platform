@@ -17,6 +17,7 @@ import {
 import { LeadResources } from "./lead-resources";
 import { AddressAutocomplete } from "./address-autocomplete";
 import { ThemeToggle } from "./theme-toggle";
+import { compressImageFile } from "../lib/image-compression";
 import styles from "./leads-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
 
@@ -177,7 +178,7 @@ export function LeadsShell() {
     }
   }
 
-  function handleLeadPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLeadPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -189,28 +190,23 @@ export function LeadsShell() {
       return;
     }
 
-    if (file.size > 300_000) {
-      setPhotoFeedback("Use an image smaller than 300 KB.");
+    try {
+      setPhotoFeedback("Optimizing photo...");
+      const compressed = await compressImageFile(file, {
+        maxBytes: 300_000,
+        maxDimension: 900,
+        initialQuality: 0.82,
+        minQuality: 0.5,
+      });
+
+      setEditorForm((current) => ({ ...current, leadPhotoDataUrl: compressed.dataUrl }));
+      setPhotoFeedback(`Lead photo ready (${Math.ceil(compressed.size / 1024)} KB).`);
       event.target.value = "";
-      return;
+    } catch (error) {
+      console.warn("[LeadsShell] failed to compress lead photo:", error);
+      setPhotoFeedback("We could not compress this photo under 300 KB.");
+      event.target.value = "";
     }
-
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-
-      setEditorForm((current) => ({ ...current, leadPhotoDataUrl: result }));
-      setPhotoFeedback("Lead photo ready.");
-      event.target.value = "";
-    };
-
-    reader.onerror = () => {
-      setPhotoFeedback("We could not read this image.");
-      event.target.value = "";
-    };
-
-    reader.readAsDataURL(file);
   }
 
   async function saveLeadUpdate(event: React.FormEvent<HTMLFormElement>) {
@@ -363,7 +359,7 @@ export function LeadsShell() {
             <form className={crmStyles.modalForm} onSubmit={saveLeadUpdate}>
               <section className={crmStyles.intakeSection}>
                 <label className={crmStyles.avatarPreview}>
-                  <input type="file" accept="image/*" onChange={handleLeadPhotoChange} />
+                  <input type="file" accept="image/jpeg,image/png" onChange={handleLeadPhotoChange} />
                   {editorForm.leadPhotoDataUrl ? (
                     <img src={editorForm.leadPhotoDataUrl} alt="Lead preview" />
                   ) : (

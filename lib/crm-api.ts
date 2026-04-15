@@ -94,6 +94,18 @@ export type LeadFileRecord = {
   updatedAt?: string;
 };
 
+export type TaskBoardTask = {
+  id: string;
+  title: string;
+  notes: string;
+};
+
+export type TaskBoardLane = {
+  id: string;
+  title: string;
+  tasks: TaskBoardTask[];
+};
+
 export type CurrentUserProfile = {
   id: string;
   email: string | null;
@@ -344,6 +356,37 @@ export async function deleteLeadFile(leadId: string, fileId: string): Promise<{ 
 
   if (!response.ok) {
     throw new Error(`Failed to delete lead file: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function getTaskBoard(): Promise<{ lanes: TaskBoardLane[] }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/task-board`, {
+    method: "GET",
+    headers: headers ?? { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch task board: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function saveTaskBoard(lanes: TaskBoardLane[]): Promise<{ lanes: TaskBoardLane[] }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/task-board`, {
+    method: "PUT",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body: JSON.stringify({ lanes }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to save task board: ${response.status}`);
   }
 
   return response.json();
