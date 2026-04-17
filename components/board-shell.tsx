@@ -2,12 +2,32 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, MoreVertical, Pencil, Search, Trash2, X } from "lucide-react";
-import { getLeads, getTaskBoard, saveTaskBoard, type LeadRecord } from "../lib/crm-api";
+import { MoreVertical, Pencil, Search, Trash2, X } from "lucide-react";
+import {
+  createLead as createLeadRequest,
+  getLeads,
+  getTaskBoard,
+  saveTaskBoard,
+  type LeadRecord,
+} from "../lib/crm-api";
 import styles from "./board-shell.module.css";
 
 type TaskStatus = "in_progress" | "done";
 type TaskStatusFilter = "all" | TaskStatus;
+
+type WalletItem = {
+  id: string;
+  description: string;
+  cost: number;
+  revenue: number;
+};
+
+type WalletDraftItem = {
+  id: string;
+  description: string;
+  cost: string;
+  revenue: string;
+};
 
 type Task = {
   id: string;
@@ -18,6 +38,7 @@ type Task = {
   leadSearch?: string;
   status: TaskStatus;
   hidden?: boolean;
+  walletItems?: WalletItem[];
 };
 
 type Lane = {
@@ -28,18 +49,28 @@ type Lane = {
 
 type DraftTask = {
   title: string;
+  titleWasSelected: boolean;
   notes: string;
   leadId: string;
   leadSearch: string;
+  newLeadName: string;
+  newLeadPhone: string;
+  isCreatingLead: boolean;
   status: TaskStatus;
+  walletItems: WalletDraftItem[];
 };
 
 const emptyTaskDraft: DraftTask = {
   title: "",
+  titleWasSelected: false,
   notes: "",
   leadId: "",
   leadSearch: "",
+  newLeadName: "",
+  newLeadPhone: "",
+  isCreatingLead: false,
   status: "in_progress",
+  walletItems: [{ id: "wallet-primary", description: "", cost: "", revenue: "" }],
 };
 
 const legacyStarterLaneIds = new Set(["lane-new", "lane-docs", "lane-review"]);
@@ -78,6 +109,72 @@ function formatPhoneNumber(value?: string | null) {
   return value ?? "";
 }
 
+function parseMoney(value: string) {
+  const parsed = Number(value.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(value);
+}
+
+function toWalletDraftItems(items?: WalletItem[]) {
+  if (!items || items.length === 0) {
+    return [{ id: "wallet-primary", description: "", cost: "", revenue: "" }];
+  }
+
+  return items.map((item) => ({
+    id: item.id,
+    description: item.description,
+    cost: item.cost ? String(item.cost) : "",
+    revenue: item.revenue ? String(item.revenue) : "",
+  }));
+}
+
+function toWalletItems(items: WalletDraftItem[], fallbackTitle: string): WalletItem[] {
+  return items
+    .map((item, index) => ({
+      id: item.id || `wallet-${index + 1}`,
+      description: item.description.trim() || (index === 0 ? fallbackTitle : ""),
+      cost: parseMoney(item.cost),
+      revenue: parseMoney(item.revenue),
+    }))
+    .filter((item) => item.description || item.cost > 0 || item.revenue > 0);
+}
+
+function getWalletTotals(items: WalletDraftItem[] | WalletItem[]) {
+  const totals = items.reduce(
+    (current, item) => {
+      const cost = typeof item.cost === "number" ? item.cost : parseMoney(item.cost);
+      const revenue = typeof item.revenue === "number" ? item.revenue : parseMoney(item.revenue);
+
+      return {
+        cost: current.cost + cost,
+        revenue: current.revenue + revenue,
+      };
+    },
+    { cost: 0, revenue: 0 }
+  );
+  const margin = totals.revenue - totals.cost;
+
+  return {
+    ...totals,
+    margin,
+    marginPercent: totals.revenue > 0 ? (margin / totals.revenue) * 100 : 0,
+  };
+}
+
+function splitLeadName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] ?? "";
+  const lastName = parts.length > 1 ? parts.slice(1).join(" ") : "Lead";
+
+  return { firstName, lastName };
+}
+
 function normalizeBoard(lanes: Lane[]): Lane[] {
   return lanes
     .filter((lane) => !legacyStarterLaneIds.has(lane.id))
@@ -87,6 +184,7 @@ function normalizeBoard(lanes: Lane[]): Lane[] {
         ...task,
         status: task.status === "done" ? "done" : "in_progress",
         hidden: task.hidden === true,
+        walletItems: task.walletItems ?? [],
       })),
     }));
 }
@@ -115,6 +213,7 @@ export function BoardShell() {
     notes: string;
     leadId?: string | null;
     status: TaskStatus;
+    walletItems: WalletDraftItem[];
   } | null>(null);
   const hasLoadedBoardRef = useRef(false);
 
@@ -201,6 +300,11 @@ export function BoardShell() {
     }
   }
 
+  function setLanesAndPersist(nextLanes: Lane[]) {
+    setLanes(nextLanes);
+    void persistBoard(nextLanes);
+  }
+
   function getLeadName(leadId?: string | null) {
     const lead = leads.find((item) => item.id === leadId);
     return lead ? getFullName(lead) : "";
@@ -232,18 +336,71 @@ export function BoardShell() {
       .slice(0, 5);
   }
 
+  function getTaskTitleSearchResults(search: string) {
+    const normalized = search.trim().toLowerCase();
+
+    if (normalized.length < 4) {
+      return [];
+    }
+
+    const titles = new Map<string, { title: string; count: number }>();
+
+    for (const lane of lanes) {
+      for (const task of lane.tasks) {
+        const title = task.title.trim();
+
+        if (!title || !title.toLowerCase().includes(normalized)) {
+          continue;
+        }
+
+        const titleKey = title.toLowerCase();
+        const current = titles.get(titleKey);
+        titles.set(titleKey, {
+          title,
+          count: (current?.count ?? 0) + 1,
+        });
+      }
+    }
+
+    return Array.from(titles.values()).slice(0, 6);
+  }
+
+  function selectTaskTitleForDraft(laneId: string, title: string) {
+    setLaneDrafts((current) => ({
+      ...current,
+      [laneId]: {
+        ...(current[laneId] ?? emptyTaskDraft),
+        title,
+        titleWasSelected: true,
+      },
+    }));
+  }
+
+  function removeTaskTitleFromDraft(laneId: string) {
+    setLaneDrafts((current) => ({
+      ...current,
+      [laneId]: {
+        ...(current[laneId] ?? emptyTaskDraft),
+        title: "",
+        titleWasSelected: false,
+      },
+    }));
+  }
+
   function addLane() {
     const title = newLaneTitle.trim();
     if (!title) return;
 
-    setLanes((current) => [
-      ...current,
+    const nextLanes = [
+      ...lanes,
       {
         id: `lane-${crypto.randomUUID()}`,
         title,
         tasks: [],
       },
-    ]);
+    ];
+
+    setLanesAndPersist(nextLanes);
     setNewLaneTitle("");
   }
 
@@ -252,7 +409,9 @@ export function BoardShell() {
   }
 
   function deleteLane(laneId: string) {
-    setLanes((current) => current.filter((lane) => lane.id !== laneId));
+    const nextLanes = lanes.filter((lane) => lane.id !== laneId);
+
+    setLanesAndPersist(nextLanes);
     setLaneDrafts((current) => {
       const next = { ...current };
       delete next[laneId];
@@ -267,6 +426,7 @@ export function BoardShell() {
       [laneId]: {
         ...(current[laneId] ?? emptyTaskDraft),
         [field]: value,
+        ...(field === "title" ? { titleWasSelected: false } : null),
         ...(field === "leadSearch" ? { leadId: "" } : null),
       },
     }));
@@ -294,6 +454,113 @@ export function BoardShell() {
     }));
   }
 
+  function updateDraftWalletItem(
+    laneId: string,
+    itemId: string,
+    field: keyof Omit<WalletDraftItem, "id">,
+    value: string
+  ) {
+    setLaneDrafts((current) => {
+      const draft = current[laneId] ?? emptyTaskDraft;
+
+      return {
+        ...current,
+        [laneId]: {
+          ...draft,
+          walletItems: draft.walletItems.map((item) =>
+            item.id === itemId ? { ...item, [field]: value } : item
+          ),
+        },
+      };
+    });
+  }
+
+  function addDraftWalletItem(laneId: string) {
+    setLaneDrafts((current) => {
+      const draft = current[laneId] ?? emptyTaskDraft;
+
+      return {
+        ...current,
+        [laneId]: {
+          ...draft,
+          walletItems: [
+            ...draft.walletItems,
+            { id: `wallet-${crypto.randomUUID()}`, description: "", cost: "", revenue: "" },
+          ],
+        },
+      };
+    });
+  }
+
+  function removeDraftWalletItem(laneId: string, itemId: string) {
+    setLaneDrafts((current) => {
+      const draft = current[laneId] ?? emptyTaskDraft;
+      const nextWalletItems = draft.walletItems.filter((item) => item.id !== itemId);
+
+      return {
+        ...current,
+        [laneId]: {
+          ...draft,
+          walletItems:
+            nextWalletItems.length > 0
+              ? nextWalletItems
+              : [{ id: "wallet-primary", description: "", cost: "", revenue: "" }],
+        },
+      };
+    });
+  }
+
+  async function createLeadForDraft(laneId: string) {
+    const draft = laneDrafts[laneId] ?? emptyTaskDraft;
+    const { firstName, lastName } = splitLeadName(draft.newLeadName);
+    const phoneNumber = draft.newLeadPhone.trim();
+
+    if (!firstName || !phoneNumber) {
+      return;
+    }
+
+    setLaneDrafts((current) => ({
+      ...current,
+      [laneId]: {
+        ...(current[laneId] ?? emptyTaskDraft),
+        isCreatingLead: true,
+      },
+    }));
+
+    try {
+      const response = await createLeadRequest({
+        firstName,
+        lastName,
+        phoneNumber,
+      });
+      const lead = response.lead as LeadRecord;
+      const leadName = getFullName(lead);
+
+      setLeads((current) => [lead, ...current]);
+      setLaneDrafts((current) => ({
+        ...current,
+        [laneId]: {
+          ...(current[laneId] ?? emptyTaskDraft),
+          leadId: lead.id,
+          leadSearch: leadName,
+          newLeadName: "",
+          newLeadPhone: "",
+          isCreatingLead: false,
+        },
+      }));
+    } catch (error) {
+      console.warn("[BoardShell] failed to create lead from task modal:", error);
+      setBoardMessage("We could not create this lead yet.");
+      setLaneDrafts((current) => ({
+        ...current,
+        [laneId]: {
+          ...(current[laneId] ?? emptyTaskDraft),
+          isCreatingLead: false,
+        },
+      }));
+    }
+  }
+
   function openTaskModal(laneId: string) {
     setLaneDrafts((current) => ({
       ...current,
@@ -304,6 +571,59 @@ export function BoardShell() {
 
   function closeTaskModal() {
     setActiveTaskModalLaneId(null);
+  }
+
+  function closeTaskEditModal() {
+    setEditingTask(null);
+  }
+
+  function updateEditingWalletItem(
+    itemId: string,
+    field: keyof Omit<WalletDraftItem, "id">,
+    value: string
+  ) {
+    setEditingTask((current) =>
+      current
+        ? {
+            ...current,
+            walletItems: current.walletItems.map((item) =>
+              item.id === itemId ? { ...item, [field]: value } : item
+            ),
+          }
+        : current
+    );
+  }
+
+  function addEditingWalletItem() {
+    setEditingTask((current) =>
+      current
+        ? {
+            ...current,
+            walletItems: [
+              ...current.walletItems,
+              { id: `wallet-${crypto.randomUUID()}`, description: "", cost: "", revenue: "" },
+            ],
+          }
+        : current
+    );
+  }
+
+  function removeEditingWalletItem(itemId: string) {
+    setEditingTask((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextWalletItems = current.walletItems.filter((item) => item.id !== itemId);
+
+      return {
+        ...current,
+        walletItems:
+          nextWalletItems.length > 0
+            ? nextWalletItems
+            : [{ id: "wallet-primary", description: "", cost: "", revenue: "" }],
+      };
+    });
   }
 
   function openTaskSearch(laneId: string) {
@@ -325,6 +645,7 @@ export function BoardShell() {
     const title = draft.title.trim();
     const notes = draft.notes.trim();
     const leadName = getLeadName(draft.leadId);
+    const walletItems = toWalletItems(draft.walletItems, title);
 
     if (!title) return;
     if (draft.leadSearch.trim() && !draft.leadId) return;
@@ -343,14 +664,14 @@ export function BoardShell() {
                 leadSearch: leadName || "",
                 leadName: leadName || null,
                 status: draft.status,
+                walletItems,
               },
             ],
           }
         : lane
     );
 
-    setLanes(nextLanes);
-    void persistBoard(nextLanes);
+    setLanesAndPersist(nextLanes);
     setLaneDrafts((current) => ({
       ...current,
       [laneId]: emptyTaskDraft,
@@ -370,56 +691,57 @@ export function BoardShell() {
       notes: task.notes,
       leadId: task.leadId,
       status: task.status,
+      walletItems: toWalletDraftItems(task.walletItems),
     });
   }
 
   function saveTaskEdit() {
     if (!editingTask?.title.trim()) return;
 
-    setLanes((current) =>
-      current.map((item) =>
-        item.id === editingTask.laneId
-          ? {
-              ...item,
-              tasks: item.tasks.map((taskItem) =>
-                taskItem.id === editingTask.taskId
-                  ? {
-                      ...taskItem,
-                      title: editingTask.title.trim(),
-                      notes: editingTask.notes.trim(),
-                      leadId: editingTask.leadId || null,
-                      leadName: getLeadName(editingTask.leadId) || taskItem.leadName || null,
-                      status: editingTask.status,
-                    }
-                  : taskItem
-              ),
-            }
-          : item
-      )
+    const nextLanes = lanes.map((item) =>
+      item.id === editingTask.laneId
+        ? {
+            ...item,
+            tasks: item.tasks.map((taskItem) =>
+              taskItem.id === editingTask.taskId
+                ? {
+                    ...taskItem,
+                    title: editingTask.title.trim(),
+                    notes: editingTask.notes.trim(),
+                    leadId: editingTask.leadId || null,
+                    leadName: getLeadName(editingTask.leadId) || taskItem.leadName || null,
+                    status: editingTask.status,
+                    walletItems: toWalletItems(editingTask.walletItems, editingTask.title.trim()),
+                  }
+                : taskItem
+            ),
+          }
+        : item
     );
 
+    setLanesAndPersist(nextLanes);
     setEditingTask(null);
   }
 
   function deleteTask(laneId: string, taskId: string) {
-    setLanes((current) =>
-      current.map((lane) =>
-        lane.id === laneId ? { ...lane, tasks: lane.tasks.filter((task) => task.id !== taskId) } : lane
-      )
+    const nextLanes = lanes.map((lane) =>
+      lane.id === laneId ? { ...lane, tasks: lane.tasks.filter((task) => task.id !== taskId) } : lane
     );
+
+    setLanesAndPersist(nextLanes);
   }
 
   function changeTaskStatus(laneId: string, taskId: string, status: TaskStatus) {
-    setLanes((current) =>
-      current.map((lane) =>
-        lane.id === laneId
-          ? {
-              ...lane,
-              tasks: lane.tasks.map((task) => (task.id === taskId ? { ...task, status } : task)),
-            }
-          : lane
-      )
+    const nextLanes = lanes.map((lane) =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            tasks: lane.tasks.map((task) => (task.id === taskId ? { ...task, status } : task)),
+          }
+        : lane
     );
+
+    setLanesAndPersist(nextLanes);
   }
 
   function hideTask(laneId: string, taskId: string) {
@@ -432,8 +754,7 @@ export function BoardShell() {
         : lane
     );
 
-    setLanes(nextLanes);
-    void persistBoard(nextLanes);
+    setLanesAndPersist(nextLanes);
   }
 
   function getTaskSearchResults() {
@@ -497,66 +818,136 @@ export function BoardShell() {
         : lane
     );
 
-    setLanes(nextLanes);
-    void persistBoard(nextLanes);
+    setLanesAndPersist(nextLanes);
     closeTaskSearch();
   }
 
   function moveTask(targetLaneId: string, targetIndex?: number) {
     if (!draggedTask) return;
 
-    setLanes((current) => {
-      const sourceLane = current.find((lane) => lane.id === draggedTask.laneId);
-      const sourceTask = sourceLane?.tasks.find((task) => task.id === draggedTask.taskId);
-      if (!sourceLane || !sourceTask) return current;
+    const sourceLane = lanes.find((lane) => lane.id === draggedTask.laneId);
+    const sourceTask = sourceLane?.tasks.find((task) => task.id === draggedTask.taskId);
+    if (!sourceLane || !sourceTask) return;
 
-      const withoutTask = current.map((lane) =>
-        lane.id === draggedTask.laneId
-          ? { ...lane, tasks: lane.tasks.filter((task) => task.id !== draggedTask.taskId) }
-          : lane
-      );
+    const withoutTask = lanes.map((lane) =>
+      lane.id === draggedTask.laneId
+        ? { ...lane, tasks: lane.tasks.filter((task) => task.id !== draggedTask.taskId) }
+        : lane
+    );
 
-      return withoutTask.map((lane) => {
-        if (lane.id !== targetLaneId) return lane;
+    const nextLanes = withoutTask.map((lane) => {
+      if (lane.id !== targetLaneId) return lane;
 
-        const nextTasks = [...lane.tasks];
-        const insertionIndex = targetIndex ?? nextTasks.length;
-        nextTasks.splice(insertionIndex, 0, sourceTask);
-        return { ...lane, tasks: nextTasks };
-      });
+      const nextTasks = [...lane.tasks];
+      const insertionIndex = targetIndex ?? nextTasks.length;
+      nextTasks.splice(insertionIndex, 0, sourceTask);
+      return { ...lane, tasks: nextTasks };
     });
 
+    setLanesAndPersist(nextLanes);
     setDraggedTask(null);
   }
 
   function reorderLane(targetLaneId: string) {
     if (!draggedLaneId || draggedLaneId === targetLaneId) return;
 
-    setLanes((current) => {
-      const startIndex = current.findIndex((lane) => lane.id === draggedLaneId);
-      const endIndex = current.findIndex((lane) => lane.id === targetLaneId);
-      if (startIndex === -1 || endIndex === -1) return current;
-      return reorder(current, startIndex, endIndex);
-    });
+    const startIndex = lanes.findIndex((lane) => lane.id === draggedLaneId);
+    const endIndex = lanes.findIndex((lane) => lane.id === targetLaneId);
+    if (startIndex === -1 || endIndex === -1) return;
+
+    setLanesAndPersist(reorder(lanes, startIndex, endIndex));
     setDraggedLaneId(null);
   }
 
   function reorderTaskWithinLane(laneId: string, taskId: string) {
     if (!draggedTask || draggedTask.laneId !== laneId || draggedTask.taskId === taskId) return;
 
-    setLanes((current) =>
-      current.map((lane) => {
-        if (lane.id !== laneId) return lane;
+    const nextLanes = lanes.map((lane) => {
+      if (lane.id !== laneId) return lane;
 
-        const startIndex = lane.tasks.findIndex((task) => task.id === draggedTask.taskId);
-        const endIndex = lane.tasks.findIndex((task) => task.id === taskId);
-        if (startIndex === -1 || endIndex === -1) return lane;
+      const startIndex = lane.tasks.findIndex((task) => task.id === draggedTask.taskId);
+      const endIndex = lane.tasks.findIndex((task) => task.id === taskId);
+      if (startIndex === -1 || endIndex === -1) return lane;
 
-        return {
-          ...lane,
-          tasks: reorder(lane.tasks, startIndex, endIndex),
-        };
-      })
+      return {
+        ...lane,
+        tasks: reorder(lane.tasks, startIndex, endIndex),
+      };
+    });
+
+    setLanesAndPersist(nextLanes);
+  }
+
+  function renderWalletEditor({
+    items,
+    title,
+    onUpdate,
+    onAdd,
+    onRemove,
+  }: {
+    items: WalletDraftItem[];
+    title: string;
+    onUpdate: (itemId: string, field: keyof Omit<WalletDraftItem, "id">, value: string) => void;
+    onAdd: () => void;
+    onRemove: (itemId: string) => void;
+  }) {
+    const totals = getWalletTotals(items);
+
+    return (
+      <section className={styles.walletPanel}>
+        <div className={styles.walletHeader}>
+          <h3>Wallet</h3>
+          <button type="button" onClick={onAdd}>
+            + New
+          </button>
+        </div>
+
+        <div className={styles.walletRows}>
+          {items.map((item, index) => (
+            <div key={item.id} className={styles.walletRow}>
+              <input
+                value={item.description || (index === 0 ? title : "")}
+                onChange={(event) => onUpdate(item.id, "description", event.target.value)}
+                placeholder={index === 0 ? title || "Task name" : "Description"}
+              />
+              <input
+                inputMode="decimal"
+                value={item.cost}
+                onChange={(event) => onUpdate(item.id, "cost", event.target.value)}
+                placeholder="Cost"
+              />
+              <input
+                inputMode="decimal"
+                value={item.revenue}
+                onChange={(event) => onUpdate(item.id, "revenue", event.target.value)}
+                placeholder="Revenue"
+              />
+              <button type="button" onClick={() => onRemove(item.id)} aria-label="Remove wallet row">
+                <X size={13} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className={styles.walletTotals}>
+          <div>
+            <span>Total cost</span>
+            <strong>{formatMoney(totals.cost)}</strong>
+          </div>
+          <div>
+            <span>Revenue</span>
+            <strong>{formatMoney(totals.revenue)}</strong>
+          </div>
+          <div>
+            <span>Margin</span>
+            <strong>{formatMoney(totals.margin)}</strong>
+          </div>
+          <div>
+            <span>Margin %</span>
+            <strong>{totals.marginPercent.toFixed(1)}%</strong>
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -666,70 +1057,21 @@ export function BoardShell() {
                           }
                         }}
                       >
-                        {editingTask?.laneId === lane.id && editingTask.taskId === task.id ? (
-                          <div className={styles.taskEditor}>
-                            <input
-                              value={editingTask.title}
-                              onChange={(event) =>
-                                setEditingTask((current) =>
-                                  current ? { ...current, title: event.target.value } : current
-                                )
-                              }
-                              placeholder="Task title"
-                            />
-                            <textarea
-                              value={editingTask.notes}
-                              onChange={(event) =>
-                                setEditingTask((current) =>
-                                  current ? { ...current, notes: event.target.value } : current
-                                )
-                              }
-                              placeholder="Task notes"
-                              rows={4}
-                            />
-                            <select
-                              value={editingTask.status}
-                              onChange={(event) =>
-                                setEditingTask((current) =>
-                                  current
-                                    ? {
-                                        ...current,
-                                        status: event.target.value === "done" ? "done" : "in_progress",
-                                      }
-                                    : current
-                                )
-                              }
-                            >
-                              <option value="in_progress">In progress</option>
-                              <option value="done">Done</option>
-                            </select>
-                            <div className={styles.taskActions}>
-                              <button type="button" onClick={saveTaskEdit}>
-                                <Check size={14} strokeWidth={2} aria-hidden="true" />
-                                <span className={styles.srOnly}>Save task</span>
-                              </button>
-                              <button type="button" onClick={() => setEditingTask(null)}>
-                                <X size={14} strokeWidth={2} aria-hidden="true" />
-                                <span className={styles.srOnly}>Cancel editing task</span>
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
+                        <>
                             <div className={styles.taskHeader}>
                               <strong>{task.title}</strong>
                               <div className={styles.taskActions}>
                                 <button type="button" onClick={() => startEditingTask(lane.id, task.id)}>
-                                  <Pencil size={14} strokeWidth={2} aria-hidden="true" />
+                                  <Pencil size={12} strokeWidth={2} aria-hidden="true" />
                                   <span className={styles.srOnly}>Edit task</span>
                                 </button>
                                 <button type="button" onClick={() => deleteTask(lane.id, task.id)}>
-                                  <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
+                                  <Trash2 size={12} strokeWidth={2} aria-hidden="true" />
                                   <span className={styles.srOnly}>Delete task</span>
                                 </button>
                               </div>
                             </div>
-                            {task.notes ? <p>{task.notes}</p> : null}
+                            {task.notes ? <p className={styles.taskDescriptionCard}>{task.notes}</p> : null}
                             {attachedLeadName ? (
                               <div className={styles.attachedLeadCard}>
                                 <div className={styles.attachedLeadTopline}>
@@ -777,8 +1119,7 @@ export function BoardShell() {
                                 Hide
                               </button>
                             ) : null}
-                          </>
-                        )}
+                        </>
                       </div>
                     );
                   })}
@@ -803,11 +1144,70 @@ export function BoardShell() {
 
             <label>
               <span>New task title</span>
-              <input
-                value={laneDrafts[activeTaskModalLaneId]?.title ?? ""}
-                onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "title", event.target.value)}
-                placeholder="New task title"
-              />
+              <div className={styles.taskTitleSearchBox}>
+                {laneDrafts[activeTaskModalLaneId]?.titleWasSelected ? (
+                  <div className={styles.selectedTitleBox}>
+                    <div>
+                      <strong>{laneDrafts[activeTaskModalLaneId]?.title}</strong>
+                      <span>Selected task title</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeTaskTitleFromDraft(activeTaskModalLaneId)}
+                      aria-label="Remove selected task title"
+                    >
+                      <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      value={laneDrafts[activeTaskModalLaneId]?.title ?? ""}
+                      onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "title", event.target.value)}
+                      placeholder="New task title"
+                    />
+                    {getTaskTitleSearchResults(laneDrafts[activeTaskModalLaneId]?.title ?? "").length > 0 ? (
+                      <div className={styles.taskTitleSearchResults}>
+                        {getTaskTitleSearchResults(laneDrafts[activeTaskModalLaneId]?.title ?? "").map((result) => (
+                          <button
+                            key={result.title.toLowerCase()}
+                            type="button"
+                            onClick={() => selectTaskTitleForDraft(activeTaskModalLaneId, result.title)}
+                          >
+                            <strong>{result.title}</strong>
+                            <span>{result.count} existing task{result.count === 1 ? "" : "s"}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+              {!laneDrafts[activeTaskModalLaneId]?.leadId ? (
+                <div className={styles.createLeadInline}>
+                  <div>
+                    <strong>Create a new lead</strong>
+                    <span>Use only name and phone, then attach automatically.</span>
+                  </div>
+                  <input
+                    value={laneDrafts[activeTaskModalLaneId]?.newLeadName ?? ""}
+                    onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "newLeadName", event.target.value)}
+                    placeholder="Lead name"
+                  />
+                  <input
+                    value={laneDrafts[activeTaskModalLaneId]?.newLeadPhone ?? ""}
+                    onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "newLeadPhone", event.target.value)}
+                    placeholder="Phone number"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => createLeadForDraft(activeTaskModalLaneId)}
+                    disabled={laneDrafts[activeTaskModalLaneId]?.isCreatingLead}
+                  >
+                    {laneDrafts[activeTaskModalLaneId]?.isCreatingLead ? "Creating..." : "Create lead"}
+                  </button>
+                </div>
+              ) : null}
             </label>
 
             <label>
@@ -883,6 +1283,14 @@ export function BoardShell() {
               </select>
             </label>
 
+            {renderWalletEditor({
+              items: laneDrafts[activeTaskModalLaneId]?.walletItems ?? emptyTaskDraft.walletItems,
+              title: laneDrafts[activeTaskModalLaneId]?.title ?? "",
+              onUpdate: (itemId, field, value) => updateDraftWalletItem(activeTaskModalLaneId, itemId, field, value),
+              onAdd: () => addDraftWalletItem(activeTaskModalLaneId),
+              onRemove: (itemId) => removeDraftWalletItem(activeTaskModalLaneId, itemId),
+            })}
+
             <button
               type="button"
               className={styles.addTaskButton}
@@ -894,6 +1302,94 @@ export function BoardShell() {
             >
               Create task
             </button>
+          </aside>
+        </div>
+      ) : null}
+
+      {editingTask ? (
+        <div className={styles.modalOverlay} onClick={closeTaskEditModal}>
+          <aside className={styles.taskEditModal} onClick={(event) => event.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div>
+                <p className={styles.eyebrow}>Edit task</p>
+                <h2>{editingTask.title}</h2>
+              </div>
+              <button type="button" className={styles.secondaryAction} onClick={closeTaskEditModal}>
+                Close
+              </button>
+            </div>
+
+            <label>
+              <span>Task title</span>
+              <input
+                value={editingTask.title}
+                onChange={(event) =>
+                  setEditingTask((current) => (current ? { ...current, title: event.target.value } : current))
+                }
+                placeholder="Task title"
+              />
+            </label>
+
+            <section className={styles.richEditorPanel}>
+              <span>Description</span>
+              <div className={styles.richToolbar} aria-hidden="true">
+                <button type="button">Sans Serif</button>
+                <button type="button">Normal</button>
+                <button type="button">B</button>
+                <button type="button">I</button>
+                <button type="button">U</button>
+                <button type="button">H1</button>
+                <button type="button">H2</button>
+                <button type="button">"</button>
+                <button type="button">•</button>
+                <button type="button">≡</button>
+                <button type="button">Link</button>
+              </div>
+              <textarea
+                value={editingTask.notes}
+                onChange={(event) =>
+                  setEditingTask((current) => (current ? { ...current, notes: event.target.value } : current))
+                }
+                placeholder="Type here..."
+              />
+            </section>
+
+            <label>
+              <span>Status</span>
+              <select
+                value={editingTask.status}
+                onChange={(event) =>
+                  setEditingTask((current) =>
+                    current
+                      ? {
+                          ...current,
+                          status: event.target.value === "done" ? "done" : "in_progress",
+                        }
+                      : current
+                  )
+                }
+              >
+                <option value="in_progress">In progress</option>
+                <option value="done">Done</option>
+              </select>
+            </label>
+
+            {renderWalletEditor({
+              items: editingTask.walletItems,
+              title: editingTask.title,
+              onUpdate: updateEditingWalletItem,
+              onAdd: addEditingWalletItem,
+              onRemove: removeEditingWalletItem,
+            })}
+
+            <div className={styles.modalActionRow}>
+              <button type="button" className={styles.secondaryAction} onClick={closeTaskEditModal}>
+                Cancel
+              </button>
+              <button type="button" className={styles.addTaskButton} onClick={saveTaskEdit}>
+                Save task
+              </button>
+            </div>
           </aside>
         </div>
       ) : null}

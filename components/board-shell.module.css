@@ -112,6 +112,9 @@
 .taskModal input,
 .taskModal select,
 .taskModal textarea,
+.taskEditModal input,
+.taskEditModal select,
+.taskEditModal textarea,
 .taskEditor input,
 .taskEditor select,
 .taskEditor textarea {
@@ -177,9 +180,9 @@
 }
 
 .lane {
-  flex: 0 0 min(300px, calc(100vw - 54px));
+  flex: 0 0 min(360px, calc(100vw - 54px));
   min-width: 0;
-  max-width: 300px;
+  max-width: 360px;
   min-height: 0;
   max-height: 100%;
   display: grid;
@@ -298,10 +301,11 @@
 }
 
 .taskActions button {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  font-size: 0.76rem;
+  min-height: 24px;
+  font-size: 0.7rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -312,6 +316,13 @@
   color: var(--muted);
   font-size: 0.86rem;
   line-height: 1.5;
+}
+
+.taskDescriptionCard {
+  padding: 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .taskStatusControl {
@@ -411,8 +422,9 @@
 }
 
 .taskModal,
-.taskSearchModal {
-  width: min(100%, 520px);
+.taskSearchModal,
+.taskEditModal {
+  width: min(100%, 760px);
   display: grid;
   gap: 16px;
   padding: 22px;
@@ -428,6 +440,12 @@
   overflow: hidden;
 }
 
+.taskEditModal {
+  width: min(100%, 960px);
+  max-height: min(860px, calc(100vh - 40px));
+  overflow: auto;
+}
+
 .modalHeader {
   display: flex;
   justify-content: space-between;
@@ -439,12 +457,14 @@
   margin: 0;
 }
 
-.taskModal label {
+.taskModal label,
+.taskEditModal label {
   display: grid;
   gap: 8px;
 }
 
 .taskModal label span,
+.taskEditModal label span,
 .taskSearchFilters label span {
   color: var(--muted);
   font-size: 0.9rem;
@@ -548,7 +568,8 @@
   font-size: 0.72rem;
 }
 
-.leadSearchBox {
+.leadSearchBox,
+.taskTitleSearchBox {
   position: relative;
   display: grid;
   gap: 8px;
@@ -559,7 +580,8 @@
   font-weight: 700;
 }
 
-.selectedLeadBox {
+.selectedLeadBox,
+.selectedTitleBox {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -570,25 +592,29 @@
   background: rgba(75, 242, 226, 0.08);
 }
 
-.selectedLeadBox div {
+.selectedLeadBox div,
+.selectedTitleBox div {
   min-width: 0;
   display: grid;
   gap: 2px;
 }
 
-.selectedLeadBox strong {
+.selectedLeadBox strong,
+.selectedTitleBox strong {
   overflow: hidden;
   color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.selectedLeadBox span {
+.selectedLeadBox span,
+.selectedTitleBox span {
   color: var(--muted);
   font-size: 0.8rem;
 }
 
-.selectedLeadBox button {
+.selectedLeadBox button,
+.selectedTitleBox button {
   width: 36px;
   height: 36px;
   border: 1px solid var(--line);
@@ -598,7 +624,202 @@
   cursor: pointer;
 }
 
-.leadSearchResults {
+.createLeadInline {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 0.8fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(75, 242, 226, 0.18);
+  background: rgba(75, 242, 226, 0.055);
+}
+
+.createLeadInline div {
+  display: grid;
+  gap: 3px;
+}
+
+.createLeadInline strong {
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.createLeadInline span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.createLeadInline input {
+  min-width: 0;
+}
+
+.createLeadInline button,
+.walletHeader button,
+.modalActionRow button {
+  border-radius: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.createLeadInline button:hover,
+.walletHeader button:hover,
+.modalActionRow button:hover {
+  background: linear-gradient(135deg, var(--accent-cool) 0%, var(--accent) 100%);
+  color: #06111f;
+  transform: translateY(-1px);
+}
+
+.createLeadInline button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.walletPanel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.walletHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.walletHeader h3 {
+  margin: 0;
+  color: var(--accent-cool);
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.walletRows {
+  display: grid;
+  gap: 8px;
+}
+
+.walletRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) 28px;
+  gap: 8px;
+  align-items: center;
+}
+
+.walletRow input {
+  min-width: 0;
+}
+
+.walletRow button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #ffd7cb;
+  cursor: pointer;
+}
+
+.walletTotals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.walletTotals div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.walletTotals span {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.walletTotals strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.richEditorPanel {
+  display: grid;
+  gap: 8px;
+}
+
+.richEditorPanel > span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.richToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 7px 7px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.richToolbar button {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.richEditorPanel textarea {
+  min-height: 240px;
+  resize: vertical;
+  border-radius: 0 0 7px 7px;
+  font: inherit;
+  line-height: 1.6;
+}
+
+.modalActionRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modalActionRow .secondaryAction {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.leadSearchResults,
+.taskTitleSearchResults {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -613,7 +834,8 @@
   box-shadow: var(--shadow);
 }
 
-.leadSearchResults button {
+.leadSearchResults button,
+.taskTitleSearchResults button {
   display: grid;
   gap: 4px;
   padding: 10px 12px;
@@ -625,11 +847,13 @@
   cursor: pointer;
 }
 
-.leadSearchResults button:hover {
+.leadSearchResults button:hover,
+.taskTitleSearchResults button:hover {
   background: rgba(75, 242, 226, 0.1);
 }
 
-.leadSearchResults span {
+.leadSearchResults span,
+.taskTitleSearchResults span {
   color: var(--muted);
   font-size: 0.82rem;
 }
@@ -731,6 +955,16 @@
 
   .addLaneBox input {
     min-width: 0;
+  }
+
+  .createLeadInline,
+  .walletRow,
+  .walletTotals {
+    grid-template-columns: 1fr;
+  }
+
+  .modalActionRow {
+    flex-direction: column;
   }
 }
 .addTaskIconButton {

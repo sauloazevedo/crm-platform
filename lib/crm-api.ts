@@ -102,6 +102,12 @@ export type TaskBoardTask = {
   leadName?: string | null;
   status?: "in_progress" | "done";
   hidden?: boolean;
+  walletItems?: Array<{
+    id: string;
+    description: string;
+    cost: number;
+    revenue: number;
+  }>;
 };
 
 export type TaskBoardLane = {
