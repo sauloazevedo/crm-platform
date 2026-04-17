@@ -10,7 +10,7 @@ import {
   type SignUpOutput,
 } from "aws-amplify/auth";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAmplifyAuthRuntimeConfig } from "../lib/amplify-auth-config";
 import { getCurrentUserProfile } from "../lib/crm-api";
 import { handleResetPassword, handleSignIn, handleSignOut, handleSignUp } from "../services/auth";
@@ -117,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isConfigured = Boolean(getAmplifyAuthRuntimeConfig());
+  const sessionCheckIdRef = useRef(0);
+  const hasBootstrappedRef = useRef(false);
 
   function rejectSession(message: string, error?: unknown) {
     if (error) {
@@ -136,10 +138,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function refreshSession() {
+    const sessionCheckId = ++sessionCheckIdRef.current;
+    const shouldApplySession = () => sessionCheckId === sessionCheckIdRef.current;
+
     if (!isConfigured) {
-      setUser(null);
-      setUserSession(null);
-      setIsLoading(false);
+      if (shouldApplySession()) {
+        setUser(null);
+        setUserSession(null);
+        setIsLoading(false);
+        hasBootstrappedRef.current = true;
+      }
       return;
     }
 
@@ -147,8 +155,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let session = await withTimeout(fetchAuthSession(), "Session check timed out.");
 
       if (!session.tokens) {
-        setUser(null);
-        setUserSession(null);
+        if (shouldApplySession()) {
+          setUser(null);
+          setUserSession(null);
+        }
         return;
       }
 
@@ -167,8 +177,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
 
         if (!session.tokens) {
-          setUser(null);
-          setUserSession(null);
+          if (shouldApplySession()) {
+            setUser(null);
+            setUserSession(null);
+          }
           return;
         }
 
@@ -181,7 +193,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         if (!mappedUser.sessionToken) {
-          rejectSession("missing custom:session_token claim after forced refresh.");
+          if (shouldApplySession()) {
+            rejectSession("missing custom:session_token claim after forced refresh.");
+          }
           return;
         }
       }
@@ -198,7 +212,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       })
         .catch((error) => {
-          rejectSession("user profile validation failed.", error);
+          if (shouldApplySession()) {
+            rejectSession("user profile validation failed.", error);
+          }
           return null;
         })
         .finally(() => window.clearTimeout(profileTimeout));
@@ -207,28 +223,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setUserSession(session);
-      setUser({
-        ...mappedUser,
-        email: userProfile?.user.email ?? mappedUser.email,
-        firstName: userProfile?.user.firstName ?? mappedUser.firstName,
-        lastName: userProfile?.user.lastName ?? mappedUser.lastName,
-        role: userProfile?.user.role ?? mappedUser.role,
-      });
+      if (shouldApplySession()) {
+        setUserSession(session);
+        setUser({
+          ...mappedUser,
+          email: userProfile?.user.email ?? mappedUser.email,
+          firstName: userProfile?.user.firstName ?? mappedUser.firstName,
+          lastName: userProfile?.user.lastName ?? mappedUser.lastName,
+          role: userProfile?.user.role ?? mappedUser.role,
+        });
+      }
     } catch (error) {
       if (!isUnauthenticatedError(error)) {
         console.error("[AuthContext] check session error:", error);
       }
 
-      setUser(null);
-      setUserSession(null);
+      if (shouldApplySession()) {
+        setUser(null);
+        setUserSession(null);
+      }
     } finally {
-      setIsLoading(false);
+      if (shouldApplySession()) {
+        hasBootstrappedRef.current = true;
+        setIsLoading(false);
+      }
     }
   }
 
   async function checkUser() {
-    setIsLoading(true);
+    if (!hasBootstrappedRef.current && !user) {
+      setIsLoading(true);
+    }
+
     await refreshSession();
   }
 

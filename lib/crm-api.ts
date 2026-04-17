@@ -94,6 +94,18 @@ export type LeadFileRecord = {
   updatedAt?: string;
 };
 
+export type LeadLogInput = {
+  title: string;
+  description?: string;
+};
+
+export type LeadLogRecord = LeadLogInput & {
+  id: string;
+  leadId: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type TaskBoardTask = {
   id: string;
   title: string;
@@ -366,6 +378,72 @@ export async function deleteLeadFile(leadId: string, fileId: string): Promise<{ 
 
   if (!response.ok) {
     throw new Error(`Failed to delete lead file: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function getLeadLogs(leadId: string): Promise<{ logs: LeadLogRecord[] }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/logs`, {
+    method: "GET",
+    headers: headers ?? { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch lead logs: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function createLeadLog(leadId: string, input: LeadLogInput): Promise<{ log: LeadLogRecord }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/logs`, {
+    method: "POST",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create lead log: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function updateLeadLog(
+  leadId: string,
+  logId: string,
+  input: LeadLogInput
+): Promise<{ log: LeadLogRecord }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/logs/${logId}`, {
+    method: "PATCH",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update lead log: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function deleteLeadLog(leadId: string, logId: string): Promise<{ id: string }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/logs/${logId}`, {
+    method: "DELETE",
+    headers: headers ?? { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete lead log: ${response.status}`);
   }
 
   return response.json();

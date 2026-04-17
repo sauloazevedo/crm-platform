@@ -2,15 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MoreVertical, Pencil, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, MoreVertical, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import {
+  createLeadLog,
   createLead as createLeadRequest,
+  deleteLeadLog,
+  getLeadCompanies,
+  getLeadFiles,
   getLeads,
+  getLeadLogs,
   getTaskBoard,
   saveTaskBoard,
+  updateLeadLog,
+  updateLead,
+  type LeadCompanyRecord,
+  type LeadFileRecord,
+  type LeadLogRecord,
   type LeadRecord,
+  type UpdateLeadInput,
 } from "../lib/crm-api";
+import { AddressAutocomplete } from "./address-autocomplete";
+import { LeadResources } from "./lead-resources";
+import { compressImageFile } from "../lib/image-compression";
 import styles from "./board-shell.module.css";
+import crmStyles from "./crm-shell.module.css";
 
 type TaskStatus = "in_progress" | "done";
 type TaskStatusFilter = "all" | TaskStatus;
@@ -60,6 +75,18 @@ type DraftTask = {
   walletItems: WalletDraftItem[];
 };
 
+const defaultWalletItems: WalletDraftItem[] = [
+  { id: "wallet-primary", description: "", cost: "", revenue: "" },
+  {
+    id: "wallet-office-expenses",
+    description: "Office expenses (printer and ink)",
+    cost: "12",
+    revenue: "",
+  },
+];
+
+const leadCategoryOptions = ["client", "recovery", "lead", "Proposal rejected", "Disqualified"];
+
 const emptyTaskDraft: DraftTask = {
   title: "",
   titleWasSelected: false,
@@ -70,7 +97,24 @@ const emptyTaskDraft: DraftTask = {
   newLeadPhone: "",
   isCreatingLead: false,
   status: "in_progress",
-  walletItems: [{ id: "wallet-primary", description: "", cost: "", revenue: "" }],
+  walletItems: defaultWalletItems,
+};
+
+const emptyLeadEditor: UpdateLeadInput = {
+  firstName: "",
+  middleName: "",
+  lastName: "",
+  leadPhotoDataUrl: "",
+  dateOfBirth: "",
+  taxId: "",
+  gender: "Male",
+  phoneNumber: "",
+  email: "",
+  address: "",
+  source: "lead",
+  serviceInterest: "Tax preparation",
+  preferredLanguage: "English",
+  notes: "",
 };
 
 const legacyStarterLaneIds = new Set(["lane-new", "lane-docs", "lane-review"]);
@@ -123,7 +167,7 @@ function formatMoney(value: number) {
 
 function toWalletDraftItems(items?: WalletItem[]) {
   if (!items || items.length === 0) {
-    return [{ id: "wallet-primary", description: "", cost: "", revenue: "" }];
+    return defaultWalletItems.map((item) => ({ ...item }));
   }
 
   return items.map((item) => ({
@@ -199,6 +243,17 @@ export function BoardShell() {
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
   const [taskSearchStatus, setTaskSearchStatus] = useState<TaskStatusFilter>("all");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
+  const [leadEditorForm, setLeadEditorForm] = useState<UpdateLeadInput>(emptyLeadEditor);
+  const [leadEditorCompanies, setLeadEditorCompanies] = useState<LeadCompanyRecord[]>([]);
+  const [leadEditorFiles, setLeadEditorFiles] = useState<Array<LeadFileRecord & { fileDataBase64?: string }>>([]);
+  const [leadEditorLogs, setLeadEditorLogs] = useState<LeadLogRecord[]>([]);
+  const [collapsedLogs, setCollapsedLogs] = useState<Record<string, boolean>>({});
+  const [expandedLeadTaskId, setExpandedLeadTaskId] = useState<string | null>(null);
+  const [leadTaskDrafts, setLeadTaskDrafts] = useState<Record<string, { notes: string; status: TaskStatus }>>({});
+  const [leadLogMessage, setLeadLogMessage] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
   const [isLoadingBoard, setIsLoadingBoard] = useState(true);
   const [boardMessage, setBoardMessage] = useState<string | null>(null);
   const [draggedLaneId, setDraggedLaneId] = useState<string | null>(null);
@@ -212,6 +267,7 @@ export function BoardShell() {
     title: string;
     notes: string;
     leadId?: string | null;
+    leadSearch: string;
     status: TaskStatus;
     walletItems: WalletDraftItem[];
   } | null>(null);
@@ -316,6 +372,275 @@ export function BoardShell() {
 
   function getTaskLeadName(task: Task) {
     return getLeadName(task.leadId) || task.leadName || "";
+  }
+
+  function formatTaxId(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 9);
+    return [digits.slice(0, 3), digits.slice(3, 5), digits.slice(5, 9)].filter(Boolean).join("-");
+  }
+
+  async function copyLeadValue(value: string | null | undefined, label: string) {
+    if (!value?.trim()) {
+      setCopyFeedback(`Add ${label} before copying.`);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value.trim());
+      setCopyFeedback(`${label} copied.`);
+    } catch (error) {
+      console.warn("[BoardShell] failed to copy lead value:", error);
+      setCopyFeedback(`We could not copy ${label}.`);
+    }
+  }
+
+  async function openLeadEditor(lead: LeadRecord) {
+    setSelectedLead(lead);
+    setCopyFeedback(null);
+    setPhotoFeedback(null);
+    setLeadLogMessage(null);
+    setExpandedLeadTaskId(null);
+    setLeadTaskDrafts({});
+    setLeadEditorForm({
+      firstName: lead.firstName ?? "",
+      middleName: lead.middleName ?? "",
+      lastName: lead.lastName ?? "",
+      leadPhotoDataUrl: lead.leadPhotoDataUrl ?? "",
+      dateOfBirth: lead.dateOfBirth ? String(lead.dateOfBirth).slice(0, 10) : "",
+      taxId: lead.taxId ?? "",
+      gender: lead.gender ?? "Male",
+      phoneNumber: formatPhoneNumber(lead.phoneNumber),
+      email: lead.email ?? "",
+      address: lead.address ?? "",
+      source: leadCategoryOptions.includes(lead.source ?? "") ? lead.source ?? "lead" : "lead",
+      serviceInterest: lead.serviceInterest ?? "Tax preparation",
+      preferredLanguage: lead.preferredLanguage ?? "English",
+      notes: lead.notes ?? "",
+    });
+
+    try {
+      const [companiesResponse, filesResponse, logsResponse] = await Promise.all([
+        getLeadCompanies(lead.id),
+        getLeadFiles(lead.id),
+        getLeadLogs(lead.id),
+      ]);
+
+      setLeadEditorCompanies(companiesResponse.companies);
+      setLeadEditorFiles(filesResponse.files);
+      setLeadEditorLogs(logsResponse.logs);
+    } catch (error) {
+      console.warn("[BoardShell] failed to load lead resources:", error);
+      setLeadEditorCompanies([]);
+      setLeadEditorFiles([]);
+      setLeadEditorLogs([]);
+    }
+  }
+
+  async function copyTaxId() {
+    if (!leadEditorForm.taxId) {
+      setCopyFeedback("Add a Tax ID before copying.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(leadEditorForm.taxId);
+      setCopyFeedback("Tax ID copied.");
+    } catch (error) {
+      console.warn("[BoardShell] failed to copy tax id:", error);
+      setCopyFeedback("We could not copy the Tax ID.");
+    }
+  }
+
+  async function handleLeadPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setPhotoFeedback("Use a JPG or PNG image.");
+      return;
+    }
+
+    try {
+      setPhotoFeedback("Optimizing photo...");
+      const compressed = await compressImageFile(file, {
+        maxBytes: 300_000,
+        maxDimension: 900,
+        initialQuality: 0.82,
+        minQuality: 0.5,
+      });
+
+      setLeadEditorForm((current) => ({ ...current, leadPhotoDataUrl: compressed.dataUrl }));
+      setPhotoFeedback(`Lead photo ready (${Math.ceil(compressed.size / 1024)} KB).`);
+      event.target.value = "";
+    } catch (error) {
+      console.warn("[BoardShell] failed to compress lead photo:", error);
+      setPhotoFeedback("We could not compress this photo under 300 KB.");
+      event.target.value = "";
+    }
+  }
+
+  async function saveLeadUpdate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedLead) {
+      return;
+    }
+
+    try {
+      const response = await updateLead(selectedLead.id, {
+        ...leadEditorForm,
+        firstName: leadEditorForm.firstName.trim(),
+        middleName: leadEditorForm.middleName?.trim(),
+        lastName: leadEditorForm.lastName.trim(),
+        phoneNumber: leadEditorForm.phoneNumber.trim(),
+        email: leadEditorForm.email?.trim(),
+        address: leadEditorForm.address?.trim(),
+      });
+      const updatedLeadName = getFullName(response.lead);
+      const nextLanes = lanes.map((lane) => ({
+        ...lane,
+        tasks: lane.tasks.map((task) =>
+          task.leadId === response.lead.id
+            ? { ...task, leadName: updatedLeadName, leadSearch: updatedLeadName }
+            : task
+        ),
+      }));
+
+      setLeads((current) => current.map((lead) => (lead.id === response.lead.id ? response.lead : lead)));
+      setLanesAndPersist(nextLanes);
+      setSelectedLead(null);
+    } catch (error) {
+      console.warn("[BoardShell] failed to update lead:", error);
+      setBoardMessage("We could not update this lead right now.");
+    }
+  }
+
+  function getLeadTaskEntries(leadId: string) {
+    return lanes.flatMap((lane) =>
+      lane.tasks
+        .filter((task) => task.leadId === leadId)
+        .map((task) => ({
+          laneId: lane.id,
+          laneTitle: lane.title,
+          task,
+        }))
+    );
+  }
+
+  function toggleLeadTaskEditor(task: Task) {
+    setExpandedLeadTaskId((current) => (current === task.id ? null : task.id));
+    setLeadTaskDrafts((current) => ({
+      ...current,
+      [task.id]: current[task.id] ?? {
+        notes: task.notes,
+        status: task.status,
+      },
+    }));
+  }
+
+  function updateLeadTaskDraft(taskId: string, patch: Partial<{ notes: string; status: TaskStatus }>) {
+    setLeadTaskDrafts((current) => ({
+      ...current,
+      [taskId]: {
+        ...(current[taskId] ?? { notes: "", status: "in_progress" }),
+        ...patch,
+      },
+    }));
+  }
+
+  function saveLeadTaskUpdate(laneId: string, taskId: string) {
+    const draft = leadTaskDrafts[taskId];
+
+    if (!draft) {
+      return;
+    }
+
+    const nextLanes = lanes.map((lane) =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            tasks: lane.tasks.map((task) =>
+              task.id === taskId
+                ? {
+                    ...task,
+                    notes: draft.notes.trim(),
+                    status: draft.status,
+                  }
+                : task
+            ),
+          }
+        : lane
+    );
+
+    setLanesAndPersist(nextLanes);
+    setExpandedLeadTaskId(null);
+  }
+
+  async function addLeadLog() {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadLogMessage(null);
+
+    try {
+      const response = await createLeadLog(selectedLead.id, {
+        title: "New log",
+        description: "",
+      });
+
+      setLeadEditorLogs((current) => [response.log, ...current]);
+      setCollapsedLogs((current) => ({ ...current, [response.log.id]: true }));
+    } catch (error) {
+      console.warn("[BoardShell] failed to create lead log:", error);
+      setLeadLogMessage("We could not create this log yet.");
+    }
+  }
+
+  async function updateLeadLogDraft(logId: string, patch: Partial<LeadLogRecord>) {
+    setLeadLogMessage(null);
+    const nextLogs = leadEditorLogs.map((log) => (log.id === logId ? { ...log, ...patch } : log));
+    setLeadEditorLogs(nextLogs);
+
+    if (!selectedLead) {
+      return;
+    }
+
+    const nextLog = nextLogs.find((log) => log.id === logId);
+
+    if (!nextLog) {
+      return;
+    }
+
+    try {
+      const response = await updateLeadLog(selectedLead.id, logId, {
+        title: nextLog.title.trim() || "New log",
+        description: nextLog.description?.trim() ?? "",
+      });
+      setLeadEditorLogs((current) => current.map((log) => (log.id === logId ? response.log : log)));
+    } catch (error) {
+      console.warn("[BoardShell] failed to update lead log:", error);
+      setLeadLogMessage("We could not save this log yet.");
+    }
+  }
+
+  async function removeLeadLog(logId: string) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadLogMessage(null);
+    setLeadEditorLogs((current) => current.filter((log) => log.id !== logId));
+
+    try {
+      await deleteLeadLog(selectedLead.id, logId);
+    } catch (error) {
+      console.warn("[BoardShell] failed to delete lead log:", error);
+      setLeadLogMessage("We could not delete this log yet.");
+    }
   }
 
   function getLeadSearchResults(search: string) {
@@ -626,6 +951,30 @@ export function BoardShell() {
     });
   }
 
+  function attachLeadToEditing(lead: LeadRecord) {
+    setEditingTask((current) =>
+      current
+        ? {
+            ...current,
+            leadId: lead.id,
+            leadSearch: getFullName(lead),
+          }
+        : current
+    );
+  }
+
+  function removeLeadFromEditing() {
+    setEditingTask((current) =>
+      current
+        ? {
+            ...current,
+            leadId: "",
+            leadSearch: "",
+          }
+        : current
+    );
+  }
+
   function openTaskSearch(laneId: string) {
     setActiveTaskSearchLaneId(laneId);
     setTaskSearchQuery("");
@@ -690,6 +1039,7 @@ export function BoardShell() {
       title: task.title,
       notes: task.notes,
       leadId: task.leadId,
+      leadSearch: getTaskLeadName(task),
       status: task.status,
       walletItems: toWalletDraftItems(task.walletItems),
     });
@@ -709,7 +1059,7 @@ export function BoardShell() {
                     title: editingTask.title.trim(),
                     notes: editingTask.notes.trim(),
                     leadId: editingTask.leadId || null,
-                    leadName: getLeadName(editingTask.leadId) || taskItem.leadName || null,
+                    leadName: editingTask.leadId ? getLeadName(editingTask.leadId) || editingTask.leadSearch : null,
                     status: editingTask.status,
                     walletItems: toWalletItems(editingTask.walletItems, editingTask.title.trim()),
                   }
@@ -1073,7 +1423,18 @@ export function BoardShell() {
                             </div>
                             {task.notes ? <p className={styles.taskDescriptionCard}>{task.notes}</p> : null}
                             {attachedLeadName ? (
-                              <div className={styles.attachedLeadCard}>
+                              <button
+                                type="button"
+                                className={`${styles.attachedLeadCard} ${
+                                  attachedLead ? styles.attachedLeadButton : ""
+                                }`}
+                                onClick={() => {
+                                  if (attachedLead) {
+                                    void openLeadEditor(attachedLead);
+                                  }
+                                }}
+                                disabled={!attachedLead}
+                              >
                                 <div className={styles.attachedLeadTopline}>
                                   <span className={styles.leadAvatar}>
                                     {attachedLead?.leadPhotoDataUrl ? (
@@ -1088,7 +1449,7 @@ export function BoardShell() {
                                   </div>
                                   <MoreVertical size={12} strokeWidth={2.4} aria-hidden="true" />
                                 </div>
-                              </div>
+                              </button>
                             ) : null}
                             <label
                               className={`${styles.taskStatusControl} ${
@@ -1355,6 +1716,48 @@ export function BoardShell() {
             </section>
 
             <label>
+              <span>Attach lead</span>
+              <div className={styles.leadSearchBox}>
+                {editingTask.leadId ? (
+                  <div className={styles.selectedLeadBox}>
+                    <div>
+                      <strong>{editingTask.leadSearch || getLeadName(editingTask.leadId)}</strong>
+                      <span>Selected lead</span>
+                    </div>
+                    <button type="button" onClick={removeLeadFromEditing} aria-label="Remove selected lead">
+                      <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      value={editingTask.leadSearch}
+                      onChange={(event) =>
+                        setEditingTask((current) =>
+                          current ? { ...current, leadId: "", leadSearch: event.target.value } : current
+                        )
+                      }
+                      placeholder="Type at least 6 letters"
+                    />
+                    {getLeadSearchResults(editingTask.leadSearch).length > 0 ? (
+                      <div className={styles.leadSearchResults}>
+                        {getLeadSearchResults(editingTask.leadSearch).map((lead) => (
+                          <button key={lead.id} type="button" onClick={() => attachLeadToEditing(lead)}>
+                            <strong>{getFullName(lead)}</strong>
+                            <span>{formatPhoneNumber(lead.phoneNumber)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {editingTask.leadSearch.trim().length >= 6 ? (
+                      <small>Select an existing lead from the results.</small>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </label>
+
+            <label>
               <span>Status</span>
               <select
                 value={editingTask.status}
@@ -1390,6 +1793,414 @@ export function BoardShell() {
                 Save task
               </button>
             </div>
+          </aside>
+        </div>
+      ) : null}
+
+      {selectedLead ? (
+        <div className={crmStyles.modalOverlay} onClick={() => setSelectedLead(null)}>
+          <aside className={crmStyles.modalCard} onClick={(event) => event.stopPropagation()}>
+            <div className={crmStyles.modalHeader}>
+              <div>
+                <p className={crmStyles.modalEyebrow}>Lead profile</p>
+                <h2>Edit lead</h2>
+              </div>
+              <button type="button" className={crmStyles.modalCloseButton} onClick={() => setSelectedLead(null)}>
+                Close
+              </button>
+            </div>
+
+            <form className={crmStyles.modalForm} onSubmit={saveLeadUpdate}>
+              <section className={crmStyles.intakeSection}>
+                <label className={crmStyles.avatarPreview}>
+                  <input type="file" accept="image/jpeg,image/png" onChange={handleLeadPhotoChange} />
+                  {leadEditorForm.leadPhotoDataUrl ? (
+                    <img src={leadEditorForm.leadPhotoDataUrl} alt="Lead preview" />
+                  ) : (
+                    <span>{leadEditorForm.firstName.slice(0, 1) || "L"}</span>
+                  )}
+                  <small>{photoFeedback ?? "Click to add photo"} JPG/PNG, max 300 KB.</small>
+                </label>
+
+                <div className={crmStyles.intakeGrid}>
+                  <label className={crmStyles.field}>
+                    <span>First name</span>
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        value={leadEditorForm.firstName}
+                        onBlur={() =>
+                          setLeadEditorForm((current) => ({ ...current, firstName: current.firstName.trim() }))
+                        }
+                        onChange={(event) =>
+                          setLeadEditorForm((current) => ({ ...current, firstName: event.target.value }))
+                        }
+                        placeholder="First name"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(leadEditorForm.firstName, "First name")}
+                        aria-label="Copy first name"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
+                  </label>
+
+                  <label className={crmStyles.field}>
+                    <span>Middle name</span>
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        value={leadEditorForm.middleName}
+                        onBlur={() =>
+                          setLeadEditorForm((current) => ({ ...current, middleName: current.middleName?.trim() }))
+                        }
+                        onChange={(event) =>
+                          setLeadEditorForm((current) => ({ ...current, middleName: event.target.value }))
+                        }
+                        placeholder="Middle name"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(leadEditorForm.middleName, "Middle name")}
+                        aria-label="Copy middle name"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
+                  </label>
+
+                  <label className={crmStyles.field}>
+                    <span>Last name</span>
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        value={leadEditorForm.lastName}
+                        onBlur={() =>
+                          setLeadEditorForm((current) => ({ ...current, lastName: current.lastName.trim() }))
+                        }
+                        onChange={(event) =>
+                          setLeadEditorForm((current) => ({ ...current, lastName: event.target.value }))
+                        }
+                        placeholder="Last name"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(leadEditorForm.lastName, "Last name")}
+                        aria-label="Copy last name"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
+                  </label>
+
+                  <label className={crmStyles.field}>
+                    <span>Date of birth</span>
+                    <input
+                      type="date"
+                      value={leadEditorForm.dateOfBirth}
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({ ...current, dateOfBirth: event.target.value }))
+                      }
+                    />
+                  </label>
+
+                  <div className={crmStyles.field}>
+                    <span>Tax ID</span>
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        inputMode="numeric"
+                        maxLength={11}
+                        value={leadEditorForm.taxId}
+                        onChange={(event) =>
+                          setLeadEditorForm((current) => ({ ...current, taxId: formatTaxId(event.target.value) }))
+                        }
+                        placeholder="xxx-xx-xxxx"
+                      />
+                      <button type="button" onClick={copyTaxId} aria-label="Copy Tax ID">
+                        <Copy size={17} />
+                      </button>
+                    </div>
+                    {copyFeedback ? <small className={crmStyles.copyFeedback}>{copyFeedback}</small> : null}
+                  </div>
+
+                  <label className={crmStyles.field}>
+                    <span>Category</span>
+                    <select
+                      value={leadEditorForm.source}
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({ ...current, source: event.target.value }))
+                      }
+                    >
+                      {leadCategoryOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className={crmStyles.fieldWide}>
+                    <span>Gender</span>
+                    <select
+                      value={leadEditorForm.gender}
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({ ...current, gender: event.target.value }))
+                      }
+                    >
+                      <option>Male</option>
+                      <option>Female</option>
+                      <option>Other</option>
+                      <option>Prefer not to say</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
+
+              <section className={crmStyles.intakeSectionStack}>
+                <h3>Contact</h3>
+                <div className={crmStyles.contactGrid}>
+                  <label className={crmStyles.field}>
+                    <span>Phone number</span>
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        value={leadEditorForm.phoneNumber}
+                        onBlur={() =>
+                          setLeadEditorForm((current) => ({
+                            ...current,
+                            phoneNumber: formatPhoneNumber(current.phoneNumber.trim()),
+                          }))
+                        }
+                        onChange={(event) =>
+                          setLeadEditorForm((current) => ({
+                            ...current,
+                            phoneNumber: formatPhoneNumber(event.target.value),
+                          }))
+                        }
+                        placeholder="(000) 000-0000"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(leadEditorForm.phoneNumber, "Phone number")}
+                        aria-label="Copy phone number"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
+                  </label>
+
+                  <label className={crmStyles.field}>
+                    <span>Email</span>
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        type="email"
+                        value={leadEditorForm.email}
+                        onBlur={() =>
+                          setLeadEditorForm((current) => ({ ...current, email: current.email?.trim() }))
+                        }
+                        onChange={(event) =>
+                          setLeadEditorForm((current) => ({ ...current, email: event.target.value }))
+                        }
+                        placeholder="client@email.com"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(leadEditorForm.email, "Email")}
+                        aria-label="Copy email"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
+                  </label>
+
+                  <label className={crmStyles.fieldFull}>
+                    <span>Address</span>
+                    <div className={crmStyles.copyInputWrap}>
+                      <AddressAutocomplete
+                        value={leadEditorForm.address ?? ""}
+                        onBlur={() =>
+                          setLeadEditorForm((current) => ({ ...current, address: current.address?.trim() }))
+                        }
+                        onChange={(address) => setLeadEditorForm((current) => ({ ...current, address }))}
+                        placeholder="Address"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(leadEditorForm.address, "Address")}
+                        aria-label="Copy address"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
+                  </label>
+                </div>
+              </section>
+
+              <section className={crmStyles.intakeSectionStack}>
+                <div className={crmStyles.sectionTitleRow}>
+                  <h3>Logs</h3>
+                  <button type="button" onClick={addLeadLog} aria-label="Add lead log">
+                    <Plus size={19} />
+                  </button>
+                </div>
+                {leadLogMessage ? <p className={crmStyles.resourceMessage}>{leadLogMessage}</p> : null}
+                <div className={styles.leadLogStack}>
+                  {leadEditorLogs.map((log) => {
+                    const isCollapsed = collapsedLogs[log.id] ?? true;
+
+                    return (
+                      <article key={log.id} className={styles.leadLogCard}>
+                        <div className={styles.leadLogHeader}>
+                          <button
+                            type="button"
+                            onClick={() => setCollapsedLogs((current) => ({ ...current, [log.id]: !isCollapsed }))}
+                            aria-label={isCollapsed ? "Open log details" : "Close log details"}
+                          >
+                            {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                          </button>
+                          <input
+                            value={log.title}
+                            onChange={(event) =>
+                              setLeadEditorLogs((current) =>
+                                current.map((item) =>
+                                  item.id === log.id ? { ...item, title: event.target.value } : item
+                                )
+                              )
+                            }
+                            onBlur={(event) => void updateLeadLogDraft(log.id, { title: event.target.value })}
+                            placeholder="Log title"
+                          />
+                          <button type="button" onClick={() => void removeLeadLog(log.id)} aria-label="Delete log">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+
+                        {!isCollapsed ? (
+                          <div className={styles.miniRichEditor}>
+                            <div aria-hidden="true">
+                              <button type="button">Sans Serif</button>
+                              <button type="button">Normal</button>
+                              <button type="button">B</button>
+                              <button type="button">I</button>
+                              <button type="button">U</button>
+                            </div>
+                            <textarea
+                              value={log.description ?? ""}
+                              onChange={(event) =>
+                                setLeadEditorLogs((current) =>
+                                  current.map((item) =>
+                                    item.id === log.id ? { ...item, description: event.target.value } : item
+                                  )
+                                )
+                              }
+                              onBlur={(event) =>
+                                void updateLeadLogDraft(log.id, { description: event.target.value })
+                              }
+                              placeholder="Type log details..."
+                            />
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+
+                  {leadEditorLogs.length === 0 ? (
+                    <p className={styles.leadEmptyState}>No logs for this lead yet.</p>
+                  ) : null}
+                </div>
+              </section>
+
+              <LeadResources
+                leadId={selectedLead.id}
+                companies={leadEditorCompanies}
+                files={leadEditorFiles}
+                onCompaniesChange={setLeadEditorCompanies}
+                onFilesChange={setLeadEditorFiles}
+                sections={["files"]}
+              />
+
+              <section className={crmStyles.intakeSectionStack}>
+                <h3>Task log</h3>
+                <div className={styles.leadTaskLogStack}>
+                  {getLeadTaskEntries(selectedLead.id).map(({ laneId, laneTitle, task }) => {
+                    const draft = leadTaskDrafts[task.id] ?? { notes: task.notes, status: task.status };
+                    const isExpanded = expandedLeadTaskId === task.id;
+
+                    return (
+                      <article key={task.id} className={styles.leadTaskLogCard}>
+                        <button type="button" onClick={() => toggleLeadTaskEditor(task)}>
+                          <div>
+                            <strong>{task.title}</strong>
+                            <span>{laneTitle}</span>
+                          </div>
+                          <small>{task.status === "done" ? "Done" : "In progress"}</small>
+                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        </button>
+
+                        {isExpanded ? (
+                          <div className={styles.leadTaskEditor}>
+                            <label>
+                              <span>Status</span>
+                              <select
+                                value={draft.status}
+                                onChange={(event) =>
+                                  updateLeadTaskDraft(task.id, {
+                                    status: event.target.value === "done" ? "done" : "in_progress",
+                                  })
+                                }
+                              >
+                                <option value="in_progress">In progress</option>
+                                <option value="done">Done</option>
+                              </select>
+                            </label>
+                            <label>
+                              <span>Description</span>
+                              <div className={styles.miniRichEditor}>
+                                <div aria-hidden="true">
+                                  <button type="button">Sans Serif</button>
+                                  <button type="button">Normal</button>
+                                  <button type="button">B</button>
+                                  <button type="button">I</button>
+                                  <button type="button">U</button>
+                                </div>
+                                <textarea
+                                  value={draft.notes}
+                                  onChange={(event) => updateLeadTaskDraft(task.id, { notes: event.target.value })}
+                                  placeholder="Task description"
+                                />
+                              </div>
+                            </label>
+                            <button type="button" onClick={() => saveLeadTaskUpdate(laneId, task.id)}>
+                              Save task
+                            </button>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+
+                  {getLeadTaskEntries(selectedLead.id).length === 0 ? (
+                    <p className={styles.leadEmptyState}>No tasks attached to this lead yet.</p>
+                  ) : null}
+                </div>
+              </section>
+
+              <LeadResources
+                leadId={selectedLead.id}
+                companies={leadEditorCompanies}
+                files={leadEditorFiles}
+                onCompaniesChange={setLeadEditorCompanies}
+                onFilesChange={setLeadEditorFiles}
+                sections={["companies"]}
+              />
+
+              <div className={crmStyles.modalActions}>
+                <button type="button" className={crmStyles.secondaryModalButton} onClick={() => setSelectedLead(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className={crmStyles.primaryModalButton}>
+                  Save lead
+                </button>
+              </div>
+            </form>
           </aside>
         </div>
       ) : null}

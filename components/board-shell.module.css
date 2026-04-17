@@ -800,6 +800,7 @@
 
 .richEditorPanel textarea {
   min-height: 240px;
+  padding: 10px;
   resize: vertical;
   border-radius: 0 0 7px 7px;
   font: inherit;
@@ -860,12 +861,29 @@
 
 .attachedLeadCard {
   display: grid;
+  width: 100%;
   margin-top: 12px;
   padding: 10px;
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.035);
   color: var(--text);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.attachedLeadButton {
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.attachedLeadButton:hover {
+  border-color: rgba(75, 242, 226, 0.28);
+  background: rgba(75, 242, 226, 0.075);
+  transform: translateY(-1px);
+}
+
+.attachedLeadCard:disabled {
+  cursor: default;
 }
 
 .attachedLeadTopline {
@@ -919,6 +937,160 @@
 
 .attachedLeadTopline svg {
   color: rgba(255, 255, 255, 0.44);
+}
+
+.leadTaskLogStack,
+.leadLogStack {
+  display: grid;
+  gap: 12px;
+}
+
+.leadTaskLogCard,
+.leadLogCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.leadTaskLogCard > button,
+.leadLogHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.leadTaskLogCard > button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.leadTaskLogCard > button div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.leadTaskLogCard strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leadTaskLogCard span,
+.leadTaskLogCard small,
+.leadTaskEditor span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.leadTaskLogCard small {
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(242, 131, 34, 0.16);
+  color: #ffd2a7;
+}
+
+.leadTaskEditor {
+  display: grid;
+  gap: 10px;
+}
+
+.leadTaskEditor label {
+  display: grid;
+  gap: 7px;
+}
+
+.leadTaskEditor select,
+.leadLogHeader input {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 10px 12px;
+}
+
+.leadTaskEditor > button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: white;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.leadLogHeader {
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+}
+
+.leadLogHeader button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.miniRichEditor {
+  display: grid;
+}
+
+.miniRichEditor div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 7px 7px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.miniRichEditor div button {
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.miniRichEditor textarea {
+  min-height: 130px;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 7px 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.55;
+}
+
+.leadEmptyState {
+  margin: 0;
+  padding: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
 }
 
 .srOnly {
