@@ -98,6 +98,10 @@ export type TaskBoardTask = {
   id: string;
   title: string;
   notes: string;
+  leadId?: string | null;
+  leadName?: string | null;
+  status?: "in_progress" | "done";
+  hidden?: boolean;
 };
 
 export type TaskBoardLane = {

@@ -12,19 +12,12 @@ import {
   createLeadCompany,
   createLeadFile,
   getLeads,
+  getTaskBoard,
   type LeadCompanyRecord,
   type LeadFileRecord,
+  type TaskBoardLane,
 } from "../lib/crm-api";
 import { compressImageFile } from "../lib/image-compression";
-
-const pipeline = [
-  { stage: "New lead", count: 14 },
-  { stage: "Consult scheduled", count: 8 },
-  { stage: "Docs pending", count: 21 },
-  { stage: "In preparation", count: 11 },
-  { stage: "Review", count: 6 },
-  { stage: "Ready to file", count: 9 },
-];
 
 type Lead = {
   id: string;
@@ -90,9 +83,24 @@ const emptyForm = {
   notes: "",
 };
 
+function formatPhoneNumber(value: string) {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+
+  return value;
+}
+
 export function CrmShell() {
   const auth = useAuth();
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
+  const [taskLanes, setTaskLanes] = useState<TaskBoardLane[]>([]);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadForm, setLeadForm] = useState(emptyForm);
   const [leadCompanies, setLeadCompanies] = useState<LeadCompanyRecord[]>([]);
@@ -155,6 +163,36 @@ export function CrmShell() {
     };
   }, [auth.isAuthenticated]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTaskBoard() {
+      if (!auth.isAuthenticated) {
+        return;
+      }
+
+      try {
+        const response = await getTaskBoard();
+
+        if (isMounted) {
+          setTaskLanes(response.lanes);
+        }
+      } catch (error) {
+        console.warn("[crm-shell] failed to load task board summary:", error);
+
+        if (isMounted) {
+          setTaskLanes([]);
+        }
+      }
+    }
+
+    void loadTaskBoard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [auth.isAuthenticated]);
+
   const orderedLeads = useMemo(
     () =>
       [...leads].sort((a, b) => {
@@ -163,6 +201,15 @@ export function CrmShell() {
         return a.lastName.localeCompare(b.lastName);
       }),
     [leads]
+  );
+
+  const laneSummaries = useMemo(
+    () =>
+      taskLanes.map((lane) => ({
+        stage: lane.title,
+        count: lane.tasks.filter((task) => task.status !== "done").length,
+      })),
+    [taskLanes]
   );
 
   function fullName(lead: Lead) {
@@ -344,14 +391,16 @@ export function CrmShell() {
           </div>
         </header>
 
-        <section className={styles.pipelineSection}>
-          {pipeline.map((item) => (
-            <article key={item.stage} className={styles.pipelineCard}>
-              <span>{item.stage}</span>
-              <strong>{item.count}</strong>
-            </article>
-          ))}
-        </section>
+        {laneSummaries.length > 0 ? (
+          <section className={styles.pipelineSection}>
+            {laneSummaries.map((item) => (
+              <article key={item.stage} className={styles.pipelineCard}>
+                <span>{item.stage}</span>
+                <strong>{item.count}</strong>
+              </article>
+            ))}
+          </section>
+        ) : null}
 
         <section className={styles.workspace}>
           <div className={styles.listCard}>
@@ -376,7 +425,7 @@ export function CrmShell() {
               {orderedLeads.map((lead) => (
                 <div key={lead.id} className={styles.tableRow}>
                   <span>{fullName(lead)}</span>
-                  <span>{lead.phoneNumber}</span>
+                  <span>{formatPhoneNumber(lead.phoneNumber)}</span>
                   <span>{lead.status}</span>
                   <span>{lead.owner}</span>
                 </div>

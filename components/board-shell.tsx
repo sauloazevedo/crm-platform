@@ -2,14 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, X, Check } from "lucide-react";
-import { getTaskBoard, saveTaskBoard } from "../lib/crm-api";
+import { Check, MoreVertical, Pencil, Search, Trash2, X } from "lucide-react";
+import { getLeads, getTaskBoard, saveTaskBoard, type LeadRecord } from "../lib/crm-api";
 import styles from "./board-shell.module.css";
+
+type TaskStatus = "in_progress" | "done";
+type TaskStatusFilter = "all" | TaskStatus;
 
 type Task = {
   id: string;
   title: string;
   notes: string;
+  leadId?: string | null;
+  leadName?: string | null;
+  leadSearch?: string;
+  status: TaskStatus;
+  hidden?: boolean;
 };
 
 type Lane = {
@@ -21,32 +29,20 @@ type Lane = {
 type DraftTask = {
   title: string;
   notes: string;
+  leadId: string;
+  leadSearch: string;
+  status: TaskStatus;
 };
 
-const initialLanes: Lane[] = [
-  {
-    id: "lane-new",
-    title: "New Intake",
-    tasks: [
-      { id: "task-1", title: "Maria Alvarez", notes: "1040 + dependents. Waiting on intake form." },
-      { id: "task-2", title: "Prime Stone LLC", notes: "Business onboarding and EIN confirmation." },
-    ],
-  },
-  {
-    id: "lane-docs",
-    title: "Docs Pending",
-    tasks: [
-      { id: "task-3", title: "Jonathan Lee", notes: "Needs W-2 and prior year return." },
-    ],
-  },
-  {
-    id: "lane-review",
-    title: "Review Queue",
-    tasks: [
-      { id: "task-4", title: "Santos Family", notes: "Final review before filing approval." },
-    ],
-  },
-];
+const emptyTaskDraft: DraftTask = {
+  title: "",
+  notes: "",
+  leadId: "",
+  leadSearch: "",
+  status: "in_progress",
+};
+
+const legacyStarterLaneIds = new Set(["lane-new", "lane-docs", "lane-review"]);
 
 function reorder<T>(items: T[], startIndex: number, endIndex: number) {
   const copy = [...items];
@@ -55,10 +51,56 @@ function reorder<T>(items: T[], startIndex: number, endIndex: number) {
   return copy;
 }
 
+function getFullName(lead: LeadRecord) {
+  return [lead.firstName, lead.middleName, lead.lastName].filter(Boolean).join(" ");
+}
+
+function getLeadInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("");
+}
+
+function formatPhoneNumber(value?: string | null) {
+  const digits = (value ?? "").replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+
+  return value ?? "";
+}
+
+function normalizeBoard(lanes: Lane[]): Lane[] {
+  return lanes
+    .filter((lane) => !legacyStarterLaneIds.has(lane.id))
+    .map((lane) => ({
+      ...lane,
+      tasks: lane.tasks.map((task) => ({
+        ...task,
+        status: task.status === "done" ? "done" : "in_progress",
+        hidden: task.hidden === true,
+      })),
+    }));
+}
+
 export function BoardShell() {
-  const [lanes, setLanes] = useState<Lane[]>(initialLanes);
+  const [lanes, setLanes] = useState<Lane[]>([]);
+  const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [newLaneTitle, setNewLaneTitle] = useState("");
   const [laneDrafts, setLaneDrafts] = useState<Record<string, DraftTask>>({});
+  const [activeTaskModalLaneId, setActiveTaskModalLaneId] = useState<string | null>(null);
+  const [activeTaskSearchLaneId, setActiveTaskSearchLaneId] = useState<string | null>(null);
+  const [taskSearchQuery, setTaskSearchQuery] = useState("");
+  const [taskSearchStatus, setTaskSearchStatus] = useState<TaskStatusFilter>("all");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [isLoadingBoard, setIsLoadingBoard] = useState(true);
   const [boardMessage, setBoardMessage] = useState<string | null>(null);
   const [draggedLaneId, setDraggedLaneId] = useState<string | null>(null);
@@ -71,6 +113,8 @@ export function BoardShell() {
     taskId: string;
     title: string;
     notes: string;
+    leadId?: string | null;
+    status: TaskStatus;
   } | null>(null);
   const hasLoadedBoardRef = useRef(false);
 
@@ -85,23 +129,45 @@ export function BoardShell() {
           return;
         }
 
-        setLanes(response.lanes.length > 0 ? response.lanes : initialLanes);
+        setLanes(normalizeBoard(response.lanes as Lane[]));
         setBoardMessage(null);
+        hasLoadedBoardRef.current = true;
       } catch (error) {
         console.warn("[BoardShell] failed to load task board:", error);
 
         if (isMounted) {
-          setBoardMessage("We could not load the saved task board yet. Showing local starter lanes.");
+          setBoardMessage("We could not load the saved task board yet.");
         }
       } finally {
         if (isMounted) {
-          hasLoadedBoardRef.current = true;
           setIsLoadingBoard(false);
         }
       }
     }
 
     void loadBoard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLeads() {
+      try {
+        const response = await getLeads();
+
+        if (isMounted) {
+          setLeads(response.leads);
+        }
+      } catch (error) {
+        console.warn("[BoardShell] failed to load leads:", error);
+      }
+    }
+
+    void loadLeads();
 
     return () => {
       isMounted = false;
@@ -116,7 +182,6 @@ export function BoardShell() {
     const timeoutId = window.setTimeout(async () => {
       try {
         await saveTaskBoard(lanes);
-        setBoardMessage("Task board saved.");
       } catch (error) {
         console.warn("[BoardShell] failed to save task board:", error);
         setBoardMessage("We could not save the task board changes yet.");
@@ -125,6 +190,47 @@ export function BoardShell() {
 
     return () => window.clearTimeout(timeoutId);
   }, [isLoadingBoard, lanes]);
+
+  async function persistBoard(nextLanes: Lane[]) {
+    try {
+      await saveTaskBoard(nextLanes);
+      setBoardMessage(null);
+    } catch (error) {
+      console.warn("[BoardShell] failed to save task board:", error);
+      setBoardMessage("We could not save the task board changes yet.");
+    }
+  }
+
+  function getLeadName(leadId?: string | null) {
+    const lead = leads.find((item) => item.id === leadId);
+    return lead ? getFullName(lead) : "";
+  }
+
+  function getLeadById(leadId?: string | null) {
+    return leads.find((item) => item.id === leadId);
+  }
+
+  function getTaskLeadName(task: Task) {
+    return getLeadName(task.leadId) || task.leadName || "";
+  }
+
+  function getLeadSearchResults(search: string) {
+    const normalized = search.trim().toLowerCase();
+
+    if (normalized.length < 6) {
+      return [];
+    }
+
+    return leads
+      .filter((lead) => {
+        const leadName = getFullName(lead).toLowerCase();
+        const phone = lead.phoneNumber.replace(/\D/g, "");
+        const queryPhone = normalized.replace(/\D/g, "");
+
+        return leadName.includes(normalized) || Boolean(queryPhone && phone.includes(queryPhone));
+      })
+      .slice(0, 5);
+  }
 
   function addLane() {
     const title = newLaneTitle.trim();
@@ -142,9 +248,7 @@ export function BoardShell() {
   }
 
   function updateLaneTitle(laneId: string, title: string) {
-    setLanes((current) =>
-      current.map((lane) => (lane.id === laneId ? { ...lane, title } : lane))
-    );
+    setLanes((current) => current.map((lane) => (lane.id === laneId ? { ...lane, title } : lane)));
   }
 
   function deleteLane(laneId: string) {
@@ -154,50 +258,104 @@ export function BoardShell() {
       delete next[laneId];
       return next;
     });
+    setActiveTaskModalLaneId((current) => (current === laneId ? null : current));
   }
 
   function updateLaneDraft(laneId: string, field: keyof DraftTask, value: string) {
     setLaneDrafts((current) => ({
       ...current,
       [laneId]: {
-        title: current[laneId]?.title ?? "",
-        notes: current[laneId]?.notes ?? "",
+        ...(current[laneId] ?? emptyTaskDraft),
         [field]: value,
+        ...(field === "leadSearch" ? { leadId: "" } : null),
       },
     }));
   }
 
-  function addTask(laneId: string) {
-    const draft = laneDrafts[laneId];
-    const title = draft?.title?.trim();
-    const notes = draft?.notes?.trim() ?? "";
-    if (!title) return;
-
-    setLanes((current) =>
-      current.map((lane) =>
-        lane.id === laneId
-          ? {
-              ...lane,
-              tasks: [
-                ...lane.tasks,
-                {
-                  id: `task-${crypto.randomUUID()}`,
-                  title,
-                  notes,
-                },
-              ],
-            }
-          : lane
-      )
-    );
-
+  function attachLeadToDraft(laneId: string, lead: LeadRecord) {
     setLaneDrafts((current) => ({
       ...current,
       [laneId]: {
-        title: "",
-        notes: "",
+        ...(current[laneId] ?? emptyTaskDraft),
+        leadId: lead.id,
+        leadSearch: getFullName(lead),
       },
     }));
+  }
+
+  function removeLeadFromDraft(laneId: string) {
+    setLaneDrafts((current) => ({
+      ...current,
+      [laneId]: {
+        ...(current[laneId] ?? emptyTaskDraft),
+        leadId: "",
+        leadSearch: "",
+      },
+    }));
+  }
+
+  function openTaskModal(laneId: string) {
+    setLaneDrafts((current) => ({
+      ...current,
+      [laneId]: current[laneId] ?? emptyTaskDraft,
+    }));
+    setActiveTaskModalLaneId(laneId);
+  }
+
+  function closeTaskModal() {
+    setActiveTaskModalLaneId(null);
+  }
+
+  function openTaskSearch(laneId: string) {
+    setActiveTaskSearchLaneId(laneId);
+    setTaskSearchQuery("");
+    setTaskSearchStatus("all");
+    setSelectedTaskIds([]);
+  }
+
+  function closeTaskSearch() {
+    setActiveTaskSearchLaneId(null);
+    setTaskSearchQuery("");
+    setTaskSearchStatus("all");
+    setSelectedTaskIds([]);
+  }
+
+  function addTask(laneId: string) {
+    const draft = laneDrafts[laneId] ?? emptyTaskDraft;
+    const title = draft.title.trim();
+    const notes = draft.notes.trim();
+    const leadName = getLeadName(draft.leadId);
+
+    if (!title) return;
+    if (draft.leadSearch.trim() && !draft.leadId) return;
+
+    const nextLanes = lanes.map((lane) =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            tasks: [
+              ...lane.tasks,
+              {
+                id: `task-${crypto.randomUUID()}`,
+                title,
+                notes,
+                leadId: draft.leadId || null,
+                leadSearch: leadName || "",
+                leadName: leadName || null,
+                status: draft.status,
+              },
+            ],
+          }
+        : lane
+    );
+
+    setLanes(nextLanes);
+    void persistBoard(nextLanes);
+    setLaneDrafts((current) => ({
+      ...current,
+      [laneId]: emptyTaskDraft,
+    }));
+    setActiveTaskModalLaneId(null);
   }
 
   function startEditingTask(laneId: string, taskId: string) {
@@ -210,6 +368,8 @@ export function BoardShell() {
       taskId,
       title: task.title,
       notes: task.notes,
+      leadId: task.leadId,
+      status: task.status,
     });
   }
 
@@ -227,6 +387,9 @@ export function BoardShell() {
                       ...taskItem,
                       title: editingTask.title.trim(),
                       notes: editingTask.notes.trim(),
+                      leadId: editingTask.leadId || null,
+                      leadName: getLeadName(editingTask.leadId) || taskItem.leadName || null,
+                      status: editingTask.status,
                     }
                   : taskItem
               ),
@@ -241,11 +404,102 @@ export function BoardShell() {
   function deleteTask(laneId: string, taskId: string) {
     setLanes((current) =>
       current.map((lane) =>
+        lane.id === laneId ? { ...lane, tasks: lane.tasks.filter((task) => task.id !== taskId) } : lane
+      )
+    );
+  }
+
+  function changeTaskStatus(laneId: string, taskId: string, status: TaskStatus) {
+    setLanes((current) =>
+      current.map((lane) =>
         lane.id === laneId
-          ? { ...lane, tasks: lane.tasks.filter((task) => task.id !== taskId) }
+          ? {
+              ...lane,
+              tasks: lane.tasks.map((task) => (task.id === taskId ? { ...task, status } : task)),
+            }
           : lane
       )
     );
+  }
+
+  function hideTask(laneId: string, taskId: string) {
+    const nextLanes = lanes.map((lane) =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            tasks: lane.tasks.map((task) => (task.id === taskId ? { ...task, hidden: true } : task)),
+          }
+        : lane
+    );
+
+    setLanes(nextLanes);
+    void persistBoard(nextLanes);
+  }
+
+  function getTaskSearchResults() {
+    const normalizedQuery = taskSearchQuery.trim().toLowerCase();
+
+    return lanes
+      .flatMap((lane) =>
+        lane.tasks.map((task) => ({
+          laneId: lane.id,
+          laneTitle: lane.title,
+          leadName: getTaskLeadName(task),
+          task,
+        }))
+      )
+      .filter(({ leadName, task }) => {
+        const matchesStatus = taskSearchStatus === "all" || task.status === taskSearchStatus;
+
+        if (!normalizedQuery) {
+          return matchesStatus;
+        }
+
+        const searchableText = [task.title, task.notes, leadName].filter(Boolean).join(" ").toLowerCase();
+        return matchesStatus && searchableText.includes(normalizedQuery);
+      });
+  }
+
+  function toggleTaskSelection(taskId: string) {
+    setSelectedTaskIds((current) =>
+      current.includes(taskId) ? current.filter((id) => id !== taskId) : [...current, taskId]
+    );
+  }
+
+  function selectAllTaskResults() {
+    setSelectedTaskIds(getTaskSearchResults().map((result) => result.task.id));
+  }
+
+  function moveSelectedTasksToLane() {
+    if (!activeTaskSearchLaneId || selectedTaskIds.length === 0) {
+      return;
+    }
+
+    const selectedIdSet = new Set(selectedTaskIds);
+    const selectedTasks = lanes.flatMap((lane) =>
+      lane.tasks
+        .filter((task) => selectedIdSet.has(task.id))
+        .map((task) => ({
+          ...task,
+          hidden: false,
+        }))
+    );
+    const withoutSelectedTasks = lanes.map((lane) => ({
+      ...lane,
+      tasks: lane.tasks.filter((task) => !selectedIdSet.has(task.id)),
+    }));
+    const nextLanes = withoutSelectedTasks.map((lane) =>
+      lane.id === activeTaskSearchLaneId
+        ? {
+            ...lane,
+            tasks: [...lane.tasks, ...selectedTasks],
+          }
+        : lane
+    );
+
+    setLanes(nextLanes);
+    void persistBoard(nextLanes);
+    closeTaskSearch();
   }
 
   function moveTask(targetLaneId: string, targetIndex?: number) {
@@ -310,22 +564,16 @@ export function BoardShell() {
     <main className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>CRM Workflow Board</p>
-          <h1>Esteiras</h1>
-          <p className={styles.copy}>
-            Organize o fluxo operacional em colunas tipo Trello. Crie esteiras, mova a ordem delas
-            e gerencie tasks por etapa.
-          </p>
-          <p className={styles.copy}>{isLoadingBoard ? "Loading saved board..." : boardMessage}</p>
+          <p className={styles.boardTitle}>CRM Workflow Board</p>
+          {isLoadingBoard || boardMessage ? (
+            <p className={styles.srOnly}>{isLoadingBoard ? "Loading saved board..." : boardMessage}</p>
+          ) : null}
         </div>
 
         <div className={styles.headerActions}>
           <div className={styles.navActions}>
             <Link href="/dashboard" className={styles.secondaryAction}>
               Back to dashboard
-            </Link>
-            <Link href="/crm" className={styles.secondaryAction}>
-              Back to CRM
             </Link>
           </div>
           <div className={styles.addLaneBox}>
@@ -341,122 +589,389 @@ export function BoardShell() {
         </div>
       </header>
 
-      <section className={styles.board}>
-        {lanes.map((lane) => (
-          <article
-            key={lane.id}
-            className={styles.lane}
-            draggable
-            onDragStart={() => setDraggedLaneId(lane.id)}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={() => reorderLane(lane.id)}
-          >
-            <div className={styles.laneHeader}>
-              <input
-                className={styles.laneTitle}
-                value={lane.title}
-                onChange={(event) => updateLaneTitle(lane.id, event.target.value)}
-              />
-              <button type="button" className={styles.deleteLaneButton} onClick={() => deleteLane(lane.id)}>
-                <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
-                <span className={styles.srOnly}>Delete lane</span>
+      <section className={styles.boardViewport}>
+        <div className={styles.board}>
+          {lanes.map((lane) => (
+            <article
+              key={lane.id}
+              className={styles.lane}
+              onDragOver={(event) => event.preventDefault()}
+            >
+              <div
+                className={styles.laneHeader}
+                draggable
+                onDragStart={() => setDraggedLaneId(lane.id)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => reorderLane(lane.id)}
+              >
+                <input
+                  className={styles.laneTitle}
+                  value={lane.title}
+                  onChange={(event) => updateLaneTitle(lane.id, event.target.value)}
+                />
+                <button type="button" className={styles.deleteLaneButton} onClick={() => deleteLane(lane.id)}>
+                  <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
+                  <span className={styles.srOnly}>Delete lane</span>
+                </button>
+              </div>
+              <div className={styles.laneMetaRow}>
+                <span>{lane.tasks.filter((task) => !task.hidden).length} cards</span>
+                <div className={styles.laneQuickActions}>
+                  <button
+                    type="button"
+                    className={styles.laneIconButton}
+                    onClick={() => openTaskSearch(lane.id)}
+                    aria-label={`Search tasks in ${lane.title}`}
+                  >
+                    <Search size={14} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.laneIconButton}
+                    onClick={() => openTaskModal(lane.id)}
+                    aria-label={`Create task in ${lane.title}`}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className={styles.taskList}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => moveTask(lane.id)}
+              >
+                {lane.tasks.filter((task) => !task.hidden).map((task) => {
+                    const attachedLead = getLeadById(task.leadId);
+                    const attachedLeadName = attachedLead ? getFullName(attachedLead) : task.leadName ?? "";
+                    const attachedLeadInitials = getLeadInitials(attachedLeadName) || "L";
+
+                    return (
+                      <div
+                        key={task.id}
+                        className={styles.taskCard}
+                        draggable
+                        onDragStart={(event) => {
+                          event.stopPropagation();
+                          setDraggedTask({ laneId: lane.id, taskId: task.id });
+                        }}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.stopPropagation();
+                          if (draggedTask?.laneId === lane.id) {
+                            reorderTaskWithinLane(lane.id, task.id);
+                          } else {
+                            const targetIndex = lane.tasks.findIndex((item) => item.id === task.id);
+                            moveTask(lane.id, targetIndex);
+                          }
+                        }}
+                      >
+                        {editingTask?.laneId === lane.id && editingTask.taskId === task.id ? (
+                          <div className={styles.taskEditor}>
+                            <input
+                              value={editingTask.title}
+                              onChange={(event) =>
+                                setEditingTask((current) =>
+                                  current ? { ...current, title: event.target.value } : current
+                                )
+                              }
+                              placeholder="Task title"
+                            />
+                            <textarea
+                              value={editingTask.notes}
+                              onChange={(event) =>
+                                setEditingTask((current) =>
+                                  current ? { ...current, notes: event.target.value } : current
+                                )
+                              }
+                              placeholder="Task notes"
+                              rows={4}
+                            />
+                            <select
+                              value={editingTask.status}
+                              onChange={(event) =>
+                                setEditingTask((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        status: event.target.value === "done" ? "done" : "in_progress",
+                                      }
+                                    : current
+                                )
+                              }
+                            >
+                              <option value="in_progress">In progress</option>
+                              <option value="done">Done</option>
+                            </select>
+                            <div className={styles.taskActions}>
+                              <button type="button" onClick={saveTaskEdit}>
+                                <Check size={14} strokeWidth={2} aria-hidden="true" />
+                                <span className={styles.srOnly}>Save task</span>
+                              </button>
+                              <button type="button" onClick={() => setEditingTask(null)}>
+                                <X size={14} strokeWidth={2} aria-hidden="true" />
+                                <span className={styles.srOnly}>Cancel editing task</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className={styles.taskHeader}>
+                              <strong>{task.title}</strong>
+                              <div className={styles.taskActions}>
+                                <button type="button" onClick={() => startEditingTask(lane.id, task.id)}>
+                                  <Pencil size={14} strokeWidth={2} aria-hidden="true" />
+                                  <span className={styles.srOnly}>Edit task</span>
+                                </button>
+                                <button type="button" onClick={() => deleteTask(lane.id, task.id)}>
+                                  <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
+                                  <span className={styles.srOnly}>Delete task</span>
+                                </button>
+                              </div>
+                            </div>
+                            {task.notes ? <p>{task.notes}</p> : null}
+                            {attachedLeadName ? (
+                              <div className={styles.attachedLeadCard}>
+                                <div className={styles.attachedLeadTopline}>
+                                  <span className={styles.leadAvatar}>
+                                    {attachedLead?.leadPhotoDataUrl ? (
+                                      <img src={attachedLead.leadPhotoDataUrl} alt={attachedLeadName} />
+                                    ) : (
+                                      attachedLeadInitials
+                                    )}
+                                  </span>
+                                  <div>
+                                    <strong>{attachedLeadName}</strong>
+                                    <small>Attached lead</small>
+                                  </div>
+                                  <MoreVertical size={12} strokeWidth={2.4} aria-hidden="true" />
+                                </div>
+                              </div>
+                            ) : null}
+                            <label
+                              className={`${styles.taskStatusControl} ${
+                                task.status === "done" ? styles.taskStatusDone : styles.taskStatusInProgress
+                              }`}
+                            >
+                              <select
+                                aria-label="Task status"
+                                value={task.status}
+                                onChange={(event) =>
+                                  changeTaskStatus(
+                                    lane.id,
+                                    task.id,
+                                    event.target.value === "done" ? "done" : "in_progress"
+                                  )
+                                }
+                              >
+                                <option value="in_progress">In progress</option>
+                                <option value="done">Done</option>
+                              </select>
+                            </label>
+                            {task.status === "done" ? (
+                              <button
+                                type="button"
+                                className={styles.hideTaskButton}
+                                onClick={() => hideTask(lane.id, task.id)}
+                              >
+                                Hide
+                              </button>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {activeTaskModalLaneId ? (
+        <div className={styles.modalOverlay} onClick={closeTaskModal}>
+          <aside className={styles.taskModal} onClick={(event) => event.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div>
+                <p className={styles.eyebrow}>New task</p>
+                <h2>Create task</h2>
+              </div>
+              <button type="button" className={styles.secondaryAction} onClick={closeTaskModal}>
+                Close
               </button>
             </div>
 
-            <div
-              className={styles.taskList}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => moveTask(lane.id)}
-            >
-              {lane.tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className={styles.taskCard}
-                  draggable
-                  onDragStart={() => setDraggedTask({ laneId: lane.id, taskId: task.id })}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    if (draggedTask?.laneId === lane.id) {
-                      reorderTaskWithinLane(lane.id, task.id);
-                    } else {
-                      const targetIndex = lane.tasks.findIndex((item) => item.id === task.id);
-                      moveTask(lane.id, targetIndex);
-                    }
-                  }}
-                >
-                  {editingTask?.laneId === lane.id && editingTask.taskId === task.id ? (
-                    <div className={styles.taskEditor}>
-                      <input
-                        value={editingTask.title}
-                        onChange={(event) =>
-                          setEditingTask((current) =>
-                            current ? { ...current, title: event.target.value } : current
-                          )
-                        }
-                        placeholder="Task title"
-                      />
-                      <textarea
-                        value={editingTask.notes}
-                        onChange={(event) =>
-                          setEditingTask((current) =>
-                            current ? { ...current, notes: event.target.value } : current
-                          )
-                        }
-                        placeholder="Task notes"
-                        rows={4}
-                      />
-                      <div className={styles.taskActions}>
-                        <button type="button" onClick={saveTaskEdit}>
-                          <Check size={16} strokeWidth={2} aria-hidden="true" />
-                          <span className={styles.srOnly}>Save task</span>
-                        </button>
-                        <button type="button" onClick={() => setEditingTask(null)}>
-                          <X size={16} strokeWidth={2} aria-hidden="true" />
-                          <span className={styles.srOnly}>Cancel editing task</span>
-                        </button>
-                      </div>
+            <label>
+              <span>New task title</span>
+              <input
+                value={laneDrafts[activeTaskModalLaneId]?.title ?? ""}
+                onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "title", event.target.value)}
+                placeholder="New task title"
+              />
+            </label>
+
+            <label>
+              <span>Attach lead</span>
+              <div className={styles.leadSearchBox}>
+                {laneDrafts[activeTaskModalLaneId]?.leadId ? (
+                  <div className={styles.selectedLeadBox}>
+                    <div>
+                      <strong>{laneDrafts[activeTaskModalLaneId]?.leadSearch}</strong>
+                      <span>Selected lead</span>
                     </div>
-                  ) : (
-                    <>
-                      <div className={styles.taskHeader}>
-                        <strong>{task.title}</strong>
-                        <div className={styles.taskActions}>
-                          <button type="button" onClick={() => startEditingTask(lane.id, task.id)}>
-                            <Pencil size={16} strokeWidth={2} aria-hidden="true" />
-                            <span className={styles.srOnly}>Edit task</span>
+                    <button
+                      type="button"
+                      onClick={() => removeLeadFromDraft(activeTaskModalLaneId)}
+                      aria-label="Remove selected lead"
+                    >
+                      <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      value={laneDrafts[activeTaskModalLaneId]?.leadSearch ?? ""}
+                      onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "leadSearch", event.target.value)}
+                      placeholder="Type at least 6 letters"
+                    />
+                    {getLeadSearchResults(laneDrafts[activeTaskModalLaneId]?.leadSearch ?? "").length > 0 ? (
+                      <div className={styles.leadSearchResults}>
+                        {getLeadSearchResults(laneDrafts[activeTaskModalLaneId]?.leadSearch ?? "").map((lead) => (
+                          <button
+                            key={lead.id}
+                            type="button"
+                            onClick={() => attachLeadToDraft(activeTaskModalLaneId, lead)}
+                          >
+                            <strong>{getFullName(lead)}</strong>
+                            <span>{formatPhoneNumber(lead.phoneNumber)}</span>
                           </button>
-                          <button type="button" onClick={() => deleteTask(lane.id, task.id)}>
-                            <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
-                            <span className={styles.srOnly}>Delete task</span>
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                      <p>{task.notes}</p>
-                    </>
-                  )}
-                </div>
+                    ) : null}
+                    {(laneDrafts[activeTaskModalLaneId]?.leadSearch ?? "").trim().length >= 6 ? (
+                      <small>Select an existing lead from the results.</small>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </label>
+
+            <label>
+              <span>Task details</span>
+              <textarea
+                value={laneDrafts[activeTaskModalLaneId]?.notes ?? ""}
+                onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "notes", event.target.value)}
+                placeholder="Task details"
+                rows={4}
+              />
+            </label>
+
+            <label>
+              <span>Status</span>
+              <select
+                value={laneDrafts[activeTaskModalLaneId]?.status ?? "in_progress"}
+                onChange={(event) =>
+                  updateLaneDraft(
+                    activeTaskModalLaneId,
+                    "status",
+                    event.target.value === "done" ? "done" : "in_progress"
+                  )
+                }
+              >
+                <option value="in_progress">In progress</option>
+                <option value="done">Done</option>
+              </select>
+            </label>
+
+            <button
+              type="button"
+              className={styles.addTaskButton}
+              disabled={Boolean(
+                (laneDrafts[activeTaskModalLaneId]?.leadSearch ?? "").trim() &&
+                  !laneDrafts[activeTaskModalLaneId]?.leadId
+              )}
+              onClick={() => addTask(activeTaskModalLaneId)}
+            >
+              Create task
+            </button>
+          </aside>
+        </div>
+      ) : null}
+
+      {activeTaskSearchLaneId ? (
+        <div className={styles.modalOverlay} onClick={closeTaskSearch}>
+          <aside className={styles.taskSearchModal} onClick={(event) => event.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div>
+                <p className={styles.eyebrow}>Search tasks</p>
+                <h2>{lanes.find((lane) => lane.id === activeTaskSearchLaneId)?.title ?? "Lane"}</h2>
+              </div>
+              <button type="button" className={styles.secondaryAction} onClick={closeTaskSearch}>
+                Close
+              </button>
+            </div>
+
+            <div className={styles.taskSearchFilters}>
+              <label>
+                <span>Status</span>
+                <select
+                  value={taskSearchStatus}
+                  onChange={(event) => setTaskSearchStatus(event.target.value as TaskStatusFilter)}
+                >
+                  <option value="all">All status</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="done">Done</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Lead or task</span>
+                <input
+                  value={taskSearchQuery}
+                  onChange={(event) => setTaskSearchQuery(event.target.value)}
+                  placeholder="Search lead name, task title, or details"
+                />
+              </label>
+            </div>
+
+            <div className={styles.taskSearchToolbar}>
+              <span>{getTaskSearchResults().length} tasks found</span>
+              <button type="button" onClick={selectAllTaskResults}>
+                Select all
+              </button>
+            </div>
+
+            <div className={styles.taskSearchResults}>
+              {getTaskSearchResults().map(({ laneTitle, leadName, task }) => (
+                <label key={task.id} className={styles.taskSearchResult}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTaskIds.includes(task.id)}
+                    onChange={() => toggleTaskSelection(task.id)}
+                  />
+                  <div>
+                    <strong>{task.title}</strong>
+                    <span>{leadName || "No attached lead"}</span>
+                    <small>
+                      {laneTitle} - {task.status === "done" ? "Done" : "In progress"}
+                      {task.hidden ? " - Hidden" : " - Live"}
+                    </small>
+                  </div>
+                </label>
               ))}
             </div>
 
-            <div className={styles.newTaskComposer}>
-              <input
-                value={laneDrafts[lane.id]?.title ?? ""}
-                onChange={(event) => updateLaneDraft(lane.id, "title", event.target.value)}
-                placeholder="New task title"
-              />
-              <textarea
-                value={laneDrafts[lane.id]?.notes ?? ""}
-                onChange={(event) => updateLaneDraft(lane.id, "notes", event.target.value)}
-                placeholder="Task details"
-                rows={3}
-              />
-              <button type="button" className={styles.addTaskButton} onClick={() => addTask(lane.id)}>
-                Add task
-              </button>
-            </div>
-          </article>
-        ))}
-      </section>
+            <button
+              type="button"
+              className={styles.addTaskButton}
+              disabled={selectedTaskIds.length === 0}
+              onClick={moveSelectedTasksToLane}
+            >
+              Move selected tasks to this lane as live
+            </button>
+          </aside>
+        </div>
+      ) : null}
     </main>
   );
 }
