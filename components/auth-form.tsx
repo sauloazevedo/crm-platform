@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import styles from "./auth-shell.module.css";
 import { useAuth } from "../contexts/AuthContext";
-import { handleConfirmResetPassword, handleConfirmSignUp } from "../services/auth";
+import { handleConfirmResetPassword, handleConfirmSignInWithNewPassword, handleConfirmSignUp } from "../services/auth";
 
 type AuthMode = "login" | "sign-up" | "reset-password";
 
@@ -78,7 +78,7 @@ function getFriendlyError(error: unknown): string {
       case "InvalidPasswordException":
         return "Your password does not meet the security requirements.";
       case "UsernameExistsException":
-        return "An account with this email already exists.";
+        return "This email already belongs to a dashboard. Log in or ask the dashboard owner for access.";
       default:
         break;
     }
@@ -103,6 +103,7 @@ export function AuthForm(props: AuthFormProps) {
   const [lastName, setLastName] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [isConfirmStep, setIsConfirmStep] = useState(false);
+  const [isNewPasswordStep, setIsNewPasswordStep] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -149,7 +150,28 @@ export function AuthForm(props: AuthFormProps) {
         const cleanedVerificationCode = verificationCode.trim();
 
         if (props.mode === "login") {
-          await auth.signIn(cleanedEmail, password);
+          if (isNewPasswordStep) {
+            if (!isPasswordValid(password)) {
+              setErrorMessage("Password requirements are not complete yet.");
+              return;
+            }
+
+            await handleConfirmSignInWithNewPassword(password);
+            await auth.checkUser();
+            router.push("/dashboard");
+            router.refresh();
+            return;
+          }
+
+          const result = await auth.signIn(cleanedEmail, password);
+
+          if (result.nextStep.signInStep === "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED") {
+            setIsNewPasswordStep(true);
+            setPassword("");
+            setSuccessMessage("Create your new password to finish joining this dashboard.");
+            return;
+          }
+
           router.push("/dashboard");
           router.refresh();
           return;
@@ -272,11 +294,11 @@ export function AuthForm(props: AuthFormProps) {
       {(props.mode === "login" || (props.mode === "sign-up" && !isConfirmStep) || (props.mode === "reset-password" && isConfirmStep)) ? (
         <>
           <label className={styles.field}>
-            <span>{props.mode === "reset-password" ? "New password" : "Password"}</span>
+            <span>{props.mode === "reset-password" || isNewPasswordStep ? "New password" : "Password"}</span>
             <div className={styles.passwordInputWrap}>
               <input
                 type={isPasswordVisible ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder={isNewPasswordStep ? "Create your new password" : "Enter your password"}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -291,7 +313,7 @@ export function AuthForm(props: AuthFormProps) {
             </div>
           </label>
 
-          {props.mode !== "login" ? <PasswordRules password={password} /> : null}
+          {props.mode !== "login" || isNewPasswordStep ? <PasswordRules password={password} /> : null}
         </>
       ) : null}
 
@@ -306,6 +328,8 @@ export function AuthForm(props: AuthFormProps) {
       >
         {isPending
           ? "Working..."
+          : isNewPasswordStep
+            ? "Save new password"
           : props.mode === "sign-up" && isConfirmStep
             ? "Confirm account"
             : props.mode === "reset-password" && isConfirmStep

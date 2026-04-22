@@ -197,13 +197,36 @@
 
 .laneHeader {
   display: flex;
-  justify-content: space-between;
   gap: 10px;
   align-items: center;
-  cursor: grab;
 }
 
-.laneHeader:active {
+.dragLaneButton {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  flex: 0 0 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 7px;
+  border: 1px dashed rgba(75, 242, 226, 0.24);
+  background: rgba(75, 242, 226, 0.06);
+  color: var(--accent-cool);
+  cursor: grab;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.dragLaneButton:hover {
+  border-style: solid;
+  border-color: rgba(75, 242, 226, 0.45);
+  background: rgba(75, 242, 226, 0.14);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.dragLaneButton:active {
   cursor: grabbing;
 }
 

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import styles from "./dashboard-shell.module.css";
 import { LogoutButton } from "./auth/logout-button";
-import { ThemeToggle } from "./theme-toggle";
 import { useAuth } from "../contexts/AuthContext";
 
 const tools = [
@@ -35,7 +34,6 @@ const tools = [
 
 export function DashboardShell() {
   const auth = useAuth();
-  console.log(auth);
   const displayName = auth.user?.firstName ?? auth.user?.email ?? "Office user";
 
   return (
@@ -65,26 +63,7 @@ export function DashboardShell() {
             <h2>Tools</h2>
             <p className={styles.userLine}>Signed in as {displayName}</p>
           </div>
-          <div className={styles.headerActions}>
-            <ThemeToggle />
-            <div className={styles.statusBadge}>Peak Season Mode</div>
-          </div>
         </header>
-
-        <section className={styles.metrics}>
-          <article>
-            <span>Open leads</span>
-            <strong>46</strong>
-          </article>
-          <article>
-            <span>Ready to file</span>
-            <strong>17</strong>
-          </article>
-          <article>
-            <span>Missing documents</span>
-            <strong>29</strong>
-          </article>
-        </section>
 
         <section className={styles.toolsGrid}>
           {tools.map((tool) => (

@@ -134,11 +134,17 @@ export type CurrentUserProfile = {
   firstName: string | null;
   lastName: string | null;
   role: string;
+  workspaceId?: string | null;
 };
 
 export type UpdateCurrentUserProfileInput = {
   firstName: string;
   lastName: string;
+};
+
+export type InviteWorkspaceUserInput = {
+  email: string;
+  role?: string;
 };
 
 export async function getCurrentUserProfile(options?: {
@@ -181,6 +187,29 @@ export async function updateCurrentUserProfile(
 
   if (!response.ok) {
     throw new Error(`Failed to update current user: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function inviteWorkspaceUser(
+  input: InviteWorkspaceUserInput
+): Promise<{ invitation: { email: string; role: string; workspaceId: string }; message: string }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  if (!headers) {
+    throw new Error("Missing authenticated user token.");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/users/invite`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.message || `Failed to invite workspace user: ${response.status}`);
   }
 
   return response.json();

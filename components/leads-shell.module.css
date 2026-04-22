@@ -1,4 +1,9 @@
 .page {
+  --tag-accent-1: #f28322;
+  --tag-accent-2: #4bf2e2;
+  --tag-accent-3: #f25d27;
+  --tag-accent-4: #8bb8ff;
+  --tag-accent-5: #ffd166;
   min-height: 100vh;
   padding: 24px;
 }
@@ -49,17 +54,31 @@
   flex-wrap: wrap;
 }
 
-.headerActions a {
-  min-height: 44px;
+.headerActions a,
+.filterToggle {
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 16px;
+  padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface-strong);
   color: var(--text);
   font-weight: 800;
+  cursor: pointer;
+}
+
+.filterToggle {
+  gap: 8px;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.filterToggle:hover,
+.headerActions a:hover {
+  border-color: rgba(75, 242, 226, 0.38);
+  background: color-mix(in srgb, var(--surface-strong) 70%, rgba(75, 242, 226, 0.14));
+  transform: translateY(-1px);
 }
 
 .headerActions .primaryLink {
@@ -68,9 +87,81 @@
   color: #fff;
 }
 
+.primaryLinkButton {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.primaryLinkButton:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.summaryCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.summaryCard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--summary-accent, var(--accent-cool)) 55%, var(--line));
+}
+
+.summaryCardActive {
+  border-color: color-mix(in srgb, var(--summary-accent, var(--accent-cool)) 65%, white 8%);
+  background: color-mix(in srgb, var(--surface) 84%, var(--summary-accent, var(--accent-cool)) 16%);
+}
+
+.summaryDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--summary-accent, var(--accent-cool));
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--summary-accent, var(--accent-cool)) 18%, transparent);
+}
+
+.summaryCard strong,
+.leadIdentity strong {
+  display: block;
+  font-size: 0.98rem;
+}
+
+.summaryCard small,
+.leadIdentity small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .filterCard {
   display: grid;
-  grid-template-columns: 1fr 1fr 0.8fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   padding: 20px;
   margin-bottom: 18px;
@@ -96,6 +187,22 @@
   color: var(--text);
 }
 
+.filterActions {
+  display: flex;
+  align-items: flex-end;
+}
+
+.clearFiltersButton {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid rgba(75, 242, 226, 0.26);
+  border-radius: 7px;
+  background: rgba(75, 242, 226, 0.08);
+  color: var(--accent-cool);
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .directoryHeader {
   display: flex;
   justify-content: space-between;
@@ -115,32 +222,53 @@
   color: var(--accent-strong);
 }
 
-.tableCard {
-  display: grid;
-  gap: 8px;
-  padding: 0;
-  overflow: hidden;
-  box-shadow: none;
-}
-
-.tableHead,
-.tableRow {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 0.8fr 70px;
+.directoryMeta {
+  display: flex;
   align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.activeFilterPill,
+.tagPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: rgba(242, 131, 34, 0.12);
+  color: #ffcf98;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.cardsGrid {
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
-  padding: 14px 22px;
 }
 
-.tableHead {
-  background: var(--surface);
-  color: var(--muted);
+.leadCard {
+  flex: 1 1 280px;
+  min-width: 280px;
+  max-width: 360px;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(75, 242, 226, 0.03) 0%, rgba(75, 242, 226, 0) 36%),
+    var(--surface);
+  box-shadow: var(--shadow);
 }
 
-.tableRow {
-  min-height: 82px;
-  background: var(--surface-strong);
-  border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+.leadCardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
 }
 
 .recordCell {
@@ -153,11 +281,12 @@
   color: inherit;
   cursor: pointer;
   text-align: left;
+  padding: 0;
 }
 
 .avatar {
-  width: 54px;
-  height: 54px;
+  width: 50px;
+  height: 50px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -173,9 +302,13 @@
   object-fit: cover;
 }
 
-.tableRow strong {
-  color: var(--text);
-  letter-spacing: 0.02em;
+.leadIdentity {
+  min-width: 0;
+}
+
+.leadIdentity strong {
+  line-height: 1.3;
+  word-break: break-word;
 }
 
 .deleteButton {
@@ -194,6 +327,40 @@
 .deleteButton:hover {
   background: rgba(242, 93, 39, 0.12);
   color: var(--accent-strong);
+}
+
+.leadCardBody {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.contactRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 52%, transparent);
+}
+
+.contactRow span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: flex-start;
+  padding-top: 4px;
 }
 
 .modalOverlay {
@@ -327,17 +494,11 @@
 @media (max-width: 900px) {
   .header,
   .filterCard,
-  .tableHead,
-  .tableRow,
   .editorForm {
     grid-template-columns: 1fr;
   }
 
   .header {
     display: grid;
-  }
-
-  .tableHead {
-    display: none;
   }
 }

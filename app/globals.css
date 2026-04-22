@@ -47,9 +47,16 @@ body {
   min-height: 100vh;
   max-width: 100%;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(75, 242, 226, 0.14), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(242, 93, 39, 0.16), transparent 28%),
+  background: radial-gradient(
+      circle at top left,
+      rgba(75, 242, 226, 0.14),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(242, 93, 39, 0.16),
+      transparent 28%
+    ),
     linear-gradient(180deg, #011c40 0%, #081526 52%, #06101d 100%);
   color: var(--text);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
@@ -57,9 +64,16 @@ body {
 }
 
 html[data-theme="light"] body {
-  background:
-    radial-gradient(circle at top left, rgba(75, 242, 226, 0.14), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(242, 131, 34, 0.16), transparent 28%),
+  background: radial-gradient(
+      circle at top left,
+      rgba(75, 242, 226, 0.14),
+      transparent 24%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(242, 131, 34, 0.16),
+      transparent 28%
+    ),
     linear-gradient(180deg, #f9fdff 0%, #eef6fb 55%, #edf4f8 100%);
 }
 

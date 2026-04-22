@@ -1,4 +1,5 @@
 import {
+  confirmSignIn,
   confirmSignUp,
   confirmResetPassword,
   resetPassword,
@@ -32,6 +33,12 @@ export const handleConfirmSignUp = async (email: string, confirmationCode: strin
   return confirmSignUp({
     username: email,
     confirmationCode,
+  });
+};
+
+export const handleConfirmSignInWithNewPassword = async (newPassword: string) => {
+  return confirmSignIn({
+    challengeResponse: newPassword,
   });
 };
 

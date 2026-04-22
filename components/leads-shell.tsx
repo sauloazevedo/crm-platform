@@ -2,24 +2,35 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Filter, Mail, Phone, Plus, Trash2 } from "lucide-react";
 import {
+  createLead,
+  createLeadLog,
   deleteLead,
+  deleteLeadLog,
   getLeadCompanies,
   getLeadFiles,
+  getLeadLogs,
   getLeads,
+  getTaskBoard,
+  saveTaskBoard,
+  updateLeadLog,
   updateLead,
   type LeadCompanyRecord,
   type LeadFileRecord,
+  type LeadLogRecord,
   type LeadRecord,
+  type TaskBoardLane,
   type UpdateLeadInput,
 } from "../lib/crm-api";
 import { LeadResources } from "./lead-resources";
 import { AddressAutocomplete } from "./address-autocomplete";
-import { ThemeToggle } from "./theme-toggle";
 import { compressImageFile } from "../lib/image-compression";
+import boardStyles from "./board-shell.module.css";
 import styles from "./leads-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
+
+type TaskStatus = "in_progress" | "done";
 
 const emptyEditor: UpdateLeadInput = {
   firstName: "",
@@ -32,11 +43,13 @@ const emptyEditor: UpdateLeadInput = {
   phoneNumber: "",
   email: "",
   address: "",
-  source: "Users",
+  source: "lead",
   serviceInterest: "Tax preparation",
   preferredLanguage: "English",
   notes: "",
 };
+
+const leadCategoryOptions = ["client", "recovery", "lead", "Proposal rejected", "Disqualified"];
 
 function fullName(lead: LeadRecord) {
   return [lead.firstName, lead.middleName, lead.lastName].filter(Boolean).join(" ");
@@ -56,20 +69,50 @@ function normalizePhone(value: string) {
   return value.replace(/\D/g, "");
 }
 
+function formatPhoneNumber(value?: string | null) {
+  const digits = (value ?? "").replace(/\D/g, "");
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+
+  return value ?? "";
+}
+
+function formatTagLabel(value?: string | null) {
+  if (!value?.trim()) {
+    return "Lead";
+  }
+
+  return value;
+}
+
 export function LeadsShell() {
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<LeadRecord | null>(null);
   const [editorForm, setEditorForm] = useState<UpdateLeadInput>(emptyEditor);
   const [editorCompanies, setEditorCompanies] = useState<LeadCompanyRecord[]>([]);
   const [editorFiles, setEditorFiles] = useState<Array<LeadFileRecord & { fileDataBase64?: string }>>([]);
+  const [editorLogs, setEditorLogs] = useState<LeadLogRecord[]>([]);
+  const [collapsedLogs, setCollapsedLogs] = useState<Record<string, boolean>>({});
+  const [expandedLeadTaskId, setExpandedLeadTaskId] = useState<string | null>(null);
+  const [leadTaskDrafts, setLeadTaskDrafts] = useState<Record<string, { notes: string; status: TaskStatus }>>({});
+  const [taskBoard, setTaskBoard] = useState<TaskBoardLane[]>([]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [nameSearch, setNameSearch] = useState("");
   const [phoneSearch, setPhoneSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [tagFilter, setTagFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
+  const [leadLogMessage, setLeadLogMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -104,9 +147,44 @@ export function LeadsShell() {
     };
   }, []);
 
-  const statuses = useMemo(() => {
-    const values = new Set(leads.map((lead) => lead.status || "new"));
-    return ["all", ...Array.from(values).sort()];
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTaskBoard() {
+      try {
+        const response = await getTaskBoard();
+
+        if (isMounted) {
+          setTaskBoard(response.lanes);
+        }
+      } catch (error) {
+        console.warn("[LeadsShell] failed to load task board:", error);
+      }
+    }
+
+    void loadTaskBoard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const tags = useMemo(() => {
+    const values = new Set(leads.map((lead) => formatTagLabel(lead.source)));
+    return ["all", ...Array.from(values).sort((a, b) => a.localeCompare(b))];
+  }, [leads]);
+
+  const tagSummary = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const lead of leads) {
+      const key = formatTagLabel(lead.source);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
   }, [leads]);
 
   const filteredLeads = useMemo(() => {
@@ -116,16 +194,20 @@ export function LeadsShell() {
     return leads.filter((lead) => {
       const matchesName = !normalizedName || normalize(fullName(lead)).includes(normalizedName);
       const matchesPhone = !normalizedPhone || normalizePhone(lead.phoneNumber).includes(normalizedPhone);
-      const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
+      const matchesTag = tagFilter === "all" || formatTagLabel(lead.source) === tagFilter;
 
-      return matchesName && matchesPhone && matchesStatus;
+      return matchesName && matchesPhone && matchesTag;
     });
-  }, [leads, nameSearch, phoneSearch, statusFilter]);
+  }, [leads, nameSearch, phoneSearch, tagFilter]);
 
   async function openLeadEditor(lead: LeadRecord) {
     setSelectedLead(lead);
+    setIsLeadModalOpen(true);
     setCopyFeedback(null);
     setPhotoFeedback(null);
+    setLeadLogMessage(null);
+    setExpandedLeadTaskId(null);
+    setLeadTaskDrafts({});
     setEditorForm({
       firstName: lead.firstName ?? "",
       middleName: lead.middleName ?? "",
@@ -134,28 +216,55 @@ export function LeadsShell() {
       dateOfBirth: lead.dateOfBirth ? String(lead.dateOfBirth).slice(0, 10) : "",
       taxId: lead.taxId ?? "",
       gender: lead.gender ?? "Male",
-      phoneNumber: lead.phoneNumber ?? "",
+      phoneNumber: formatPhoneNumber(lead.phoneNumber),
       email: lead.email ?? "",
       address: lead.address ?? "",
-      source: lead.source ?? "Users",
+      source: leadCategoryOptions.includes(lead.source ?? "") ? lead.source ?? "lead" : "lead",
       serviceInterest: lead.serviceInterest ?? "Tax preparation",
       preferredLanguage: lead.preferredLanguage ?? "English",
       notes: lead.notes ?? "",
     });
 
     try {
-      const [companiesResponse, filesResponse] = await Promise.all([
+      const [companiesResponse, filesResponse, logsResponse] = await Promise.all([
         getLeadCompanies(lead.id),
         getLeadFiles(lead.id),
+        getLeadLogs(lead.id),
       ]);
 
       setEditorCompanies(companiesResponse.companies);
       setEditorFiles(filesResponse.files);
+      setEditorLogs(logsResponse.logs);
     } catch (error) {
       console.warn("[LeadsShell] failed to load lead resources:", error);
       setEditorCompanies([]);
       setEditorFiles([]);
+      setEditorLogs([]);
     }
+  }
+
+  function openNewLeadModal() {
+    setSelectedLead(null);
+    setIsLeadModalOpen(true);
+    setCopyFeedback(null);
+    setPhotoFeedback(null);
+    setLeadLogMessage(null);
+    setExpandedLeadTaskId(null);
+    setLeadTaskDrafts({});
+    setEditorForm(emptyEditor);
+    setEditorCompanies([]);
+    setEditorFiles([]);
+    setEditorLogs([]);
+  }
+
+  function closeLeadModal() {
+    setSelectedLead(null);
+    setIsLeadModalOpen(false);
+    setCopyFeedback(null);
+    setPhotoFeedback(null);
+    setLeadLogMessage(null);
+    setExpandedLeadTaskId(null);
+    setLeadTaskDrafts({});
   }
 
   function formatTaxId(value: string) {
@@ -175,6 +284,21 @@ export function LeadsShell() {
     } catch (error) {
       console.warn("[LeadsShell] failed to copy tax id:", error);
       setCopyFeedback("We could not copy the Tax ID.");
+    }
+  }
+
+  async function copyLeadValue(value: string | null | undefined, label: string) {
+    if (!value?.trim()) {
+      setCopyFeedback(`Add ${label} before copying.`);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value.trim());
+      setCopyFeedback(`${label} copied.`);
+    } catch (error) {
+      console.warn("[LeadsShell] failed to copy lead value:", error);
+      setCopyFeedback(`We could not copy ${label}.`);
     }
   }
 
@@ -212,12 +336,8 @@ export function LeadsShell() {
   async function saveLeadUpdate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedLead) {
-      return;
-    }
-
     try {
-      const response = await updateLead(selectedLead.id, {
+      const payload = {
         ...editorForm,
         firstName: editorForm.firstName.trim(),
         middleName: editorForm.middleName?.trim(),
@@ -225,13 +345,152 @@ export function LeadsShell() {
         phoneNumber: editorForm.phoneNumber.trim(),
         email: editorForm.email?.trim(),
         address: editorForm.address?.trim(),
-      });
+      };
 
-      setLeads((current) => current.map((lead) => (lead.id === selectedLead.id ? response.lead : lead)));
-      setSelectedLead(null);
+      if (selectedLead) {
+        const response = await updateLead(selectedLead.id, payload);
+        setLeads((current) => current.map((lead) => (lead.id === selectedLead.id ? response.lead : lead)));
+      } else {
+        const response = await createLead(payload);
+        setLeads((current) => [response.lead, ...current]);
+      }
+
+      closeLeadModal();
     } catch (error) {
       console.warn("[LeadsShell] failed to update lead:", error);
-      setMessage("We could not update this lead right now.");
+      setMessage(selectedLead ? "We could not update this lead right now." : "We could not create this lead right now.");
+    }
+  }
+
+  function getLeadTaskEntries(leadId: string) {
+    return taskBoard.flatMap((lane) =>
+      lane.tasks
+        .filter((task) => task.leadId === leadId)
+        .map((task) => ({
+          laneId: lane.id,
+          laneTitle: lane.title,
+          task,
+        }))
+    );
+  }
+
+  function toggleLeadTaskEditor(task: TaskBoardLane["tasks"][number]) {
+    setExpandedLeadTaskId((current) => (current === task.id ? null : task.id));
+    setLeadTaskDrafts((current) => ({
+      ...current,
+      [task.id]: current[task.id] ?? {
+        notes: task.notes,
+        status: task.status === "done" ? "done" : "in_progress",
+      },
+    }));
+  }
+
+  function updateLeadTaskDraft(taskId: string, patch: Partial<{ notes: string; status: TaskStatus }>) {
+    setLeadTaskDrafts((current) => ({
+      ...current,
+      [taskId]: {
+        ...(current[taskId] ?? { notes: "", status: "in_progress" }),
+        ...patch,
+      },
+    }));
+  }
+
+  async function saveLeadTaskUpdate(laneId: string, taskId: string) {
+    const draft = leadTaskDrafts[taskId];
+
+    if (!draft) {
+      return;
+    }
+
+    const nextTaskBoard = taskBoard.map((lane) =>
+      lane.id === laneId
+        ? {
+            ...lane,
+            tasks: lane.tasks.map((task) =>
+              task.id === taskId
+                ? {
+                    ...task,
+                    notes: draft.notes.trim(),
+                    status: draft.status,
+                  }
+                : task
+            ),
+          }
+        : lane
+    );
+
+    setTaskBoard(nextTaskBoard);
+
+    try {
+      await saveTaskBoard(nextTaskBoard);
+      setExpandedLeadTaskId(null);
+    } catch (error) {
+      console.warn("[LeadsShell] failed to save task board:", error);
+      setMessage("We could not save this task right now.");
+    }
+  }
+
+  async function addLeadLog() {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadLogMessage(null);
+
+    try {
+      const response = await createLeadLog(selectedLead.id, {
+        title: "New log",
+        description: "",
+      });
+
+      setEditorLogs((current) => [response.log, ...current]);
+      setCollapsedLogs((current) => ({ ...current, [response.log.id]: true }));
+    } catch (error) {
+      console.warn("[LeadsShell] failed to create lead log:", error);
+      setLeadLogMessage("We could not create this log yet.");
+    }
+  }
+
+  async function updateLeadLogDraft(logId: string, patch: Partial<LeadLogRecord>) {
+    setLeadLogMessage(null);
+    const nextLogs = editorLogs.map((log) => (log.id === logId ? { ...log, ...patch } : log));
+    setEditorLogs(nextLogs);
+
+    if (!selectedLead) {
+      return;
+    }
+
+    const nextLog = nextLogs.find((log) => log.id === logId);
+
+    if (!nextLog) {
+      return;
+    }
+
+    try {
+      const response = await updateLeadLog(selectedLead.id, logId, {
+        title: nextLog.title.trim() || "New log",
+        description: nextLog.description?.trim() ?? "",
+      });
+      setEditorLogs((current) => current.map((log) => (log.id === logId ? response.log : log)));
+    } catch (error) {
+      console.warn("[LeadsShell] failed to update lead log:", error);
+      setLeadLogMessage("We could not save this log yet.");
+    }
+  }
+
+  async function removeLeadLog(logId: string) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadLogMessage(null);
+    setEditorLogs((current) => current.filter((log) => log.id !== logId));
+
+    try {
+      await deleteLeadLog(selectedLead.id, logId);
+    } catch (error) {
+      console.warn("[LeadsShell] failed to delete lead log:", error);
+      setLeadLogMessage("We could not delete this log yet.");
     }
   }
 
@@ -256,84 +515,136 @@ export function LeadsShell() {
         <div>
           <p className={styles.eyebrow}>Lead directory</p>
           <h1>Leads</h1>
-          <p>Search and filter your lead directory by name, phone, and status.</p>
+          <p>Organize sua base por tag, encontre contatos rápido e abra o profile sem sair da listagem.</p>
         </div>
         <div className={styles.headerActions}>
-          <ThemeToggle />
+          <button type="button" className={styles.filterToggle} onClick={() => setIsFilterOpen((current) => !current)}>
+            <Filter size={16} strokeWidth={2} aria-hidden="true" />
+            Filters
+          </button>
           <Link href="/dashboard">Back to dashboard</Link>
-          <Link href="/crm" className={styles.primaryLink}>
-            CRM
-          </Link>
+          <button type="button" className={styles.primaryLinkButton} onClick={openNewLeadModal}>
+            New lead
+          </button>
         </div>
       </header>
 
-      <section className={styles.filterCard}>
-        <label>
-          <span>Name search</span>
-          <input
-            value={nameSearch}
-            onBlur={() => setNameSearch(nameSearch.trim())}
-            onChange={(event) => setNameSearch(event.target.value)}
-            placeholder="Search by lead name"
-          />
-        </label>
-
-        <label>
-          <span>Phone search</span>
-          <input
-            value={phoneSearch}
-            onBlur={() => setPhoneSearch(phoneSearch.trim())}
-            onChange={(event) => setPhoneSearch(event.target.value)}
-            placeholder="Search by phone"
-          />
-        </label>
-
-        <label>
-          <span>Status Filter</span>
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {status === "all" ? "Status" : status}
-              </option>
-            ))}
-          </select>
-        </label>
+      <section className={styles.summaryGrid}>
+        {tagSummary.map((item, index) => (
+          <button
+            key={item.tag}
+            type="button"
+            className={`${styles.summaryCard} ${tagFilter === item.tag ? styles.summaryCardActive : ""}`}
+            onClick={() => setTagFilter((current) => (current === item.tag ? "all" : item.tag))}
+          >
+            <span
+              className={styles.summaryDot}
+              style={{ ["--summary-accent" as string]: `var(--tag-accent-${(index % 5) + 1})` }}
+            />
+            <div>
+              <strong>{item.tag}</strong>
+              <small>{item.count} leads</small>
+            </div>
+          </button>
+        ))}
       </section>
+
+      {isFilterOpen ? (
+        <section className={styles.filterCard}>
+          <label>
+            <span>Name search</span>
+            <input
+              value={nameSearch}
+              onBlur={() => setNameSearch(nameSearch.trim())}
+              onChange={(event) => setNameSearch(event.target.value)}
+              placeholder="Search by lead name"
+            />
+          </label>
+
+          <label>
+            <span>Phone search</span>
+            <input
+              value={phoneSearch}
+              onBlur={() => setPhoneSearch(phoneSearch.trim())}
+              onChange={(event) => setPhoneSearch(event.target.value)}
+              placeholder="Search by phone"
+            />
+          </label>
+
+          <label>
+            <span>Tag</span>
+            <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
+              {tags.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag === "all" ? "All tags" : tag}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className={styles.filterActions}>
+            <button
+              type="button"
+              className={styles.clearFiltersButton}
+              onClick={() => {
+                setNameSearch("");
+                setPhoneSearch("");
+                setTagFilter("all");
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className={styles.directoryHeader}>
         <h2>Directory ({isLoading ? "..." : filteredLeads.length})</h2>
-        {message ? <p>{message}</p> : null}
+        <div className={styles.directoryMeta}>
+          <span className={styles.activeFilterPill}>{tagFilter === "all" ? "All tags" : tagFilter}</span>
+          {message ? <p>{message}</p> : null}
+        </div>
       </section>
 
-      <section className={styles.tableCard}>
-        <div className={styles.tableHead}>
-          <span>Record</span>
-          <span>Phone</span>
-          <span>Status</span>
-          <span aria-label="Actions" />
-        </div>
-
+      <section className={styles.cardsGrid}>
         {filteredLeads.map((lead) => (
-          <article key={lead.id} className={styles.tableRow}>
-            <button type="button" className={styles.recordCell} onClick={() => void openLeadEditor(lead)}>
-              <div className={styles.avatar}>
-                {lead.leadPhotoDataUrl ? (
-                  <img src={lead.leadPhotoDataUrl} alt="" />
-                ) : (
-                  <span>{initials(lead)}</span>
-                )}
+          <article key={lead.id} className={styles.leadCard}>
+            <div className={styles.leadCardHeader}>
+              <button type="button" className={styles.recordCell} onClick={() => void openLeadEditor(lead)}>
+                <div className={styles.avatar}>
+                  {lead.leadPhotoDataUrl ? (
+                    <img src={lead.leadPhotoDataUrl} alt="" />
+                  ) : (
+                    <span>{initials(lead)}</span>
+                  )}
+                </div>
+                <div className={styles.leadIdentity}>
+                  <strong>{fullName(lead)}</strong>
+                  <small>{lead.updatedAt ? new Date(lead.updatedAt).toLocaleDateString("en-US") : "Lead record"}</small>
+                </div>
+              </button>
+              <button
+                type="button"
+                className={styles.deleteButton}
+                aria-label={`Delete ${fullName(lead)}`}
+                onClick={() => setLeadToDelete(lead)}
+              >
+                <Trash2 size={17} />
+              </button>
+            </div>
+
+            <button type="button" className={styles.leadCardBody} onClick={() => void openLeadEditor(lead)}>
+              <div className={styles.contactRow}>
+                <Phone size={15} strokeWidth={2} aria-hidden="true" />
+                <span>{formatPhoneNumber(lead.phoneNumber) || "No phone yet"}</span>
               </div>
-              <strong>{fullName(lead)}</strong>
-            </button>
-            <strong>{lead.phoneNumber}</strong>
-            <strong>{lead.status || "new"}</strong>
-            <button
-              type="button"
-              className={styles.deleteButton}
-              aria-label={`Delete ${fullName(lead)}`}
-              onClick={() => setLeadToDelete(lead)}
-            >
-              <Trash2 size={19} />
+              <div className={styles.contactRow}>
+                <Mail size={15} strokeWidth={2} aria-hidden="true" />
+                <span>{lead.email?.trim() || "No email yet"}</span>
+              </div>
+              <div className={styles.cardFooter}>
+                <span className={styles.tagPill}>{formatTagLabel(lead.source)}</span>
+              </div>
             </button>
           </article>
         ))}
@@ -343,15 +654,15 @@ export function LeadsShell() {
         ) : null}
       </section>
 
-      {selectedLead ? (
-        <div className={crmStyles.modalOverlay} onClick={() => setSelectedLead(null)}>
+      {isLeadModalOpen ? (
+        <div className={crmStyles.modalOverlay} onClick={closeLeadModal}>
           <aside className={crmStyles.modalCard} onClick={(event) => event.stopPropagation()}>
             <div className={crmStyles.modalHeader}>
               <div>
                 <p className={crmStyles.modalEyebrow}>Lead profile</p>
-                <h2>Edit lead</h2>
+                <h2>{selectedLead ? "Edit lead" : "New lead"}</h2>
               </div>
-              <button type="button" className={crmStyles.modalCloseButton} onClick={() => setSelectedLead(null)}>
+              <button type="button" className={crmStyles.modalCloseButton} onClick={closeLeadModal}>
                 Close
               </button>
             </div>
@@ -371,32 +682,59 @@ export function LeadsShell() {
                 <div className={crmStyles.intakeGrid}>
                   <label className={crmStyles.field}>
                     <span>First name</span>
-                    <input
-                      value={editorForm.firstName}
-                      onBlur={() => setEditorForm((current) => ({ ...current, firstName: current.firstName.trim() }))}
-                      onChange={(event) => setEditorForm((current) => ({ ...current, firstName: event.target.value }))}
-                      placeholder="First name"
-                    />
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        value={editorForm.firstName}
+                        onBlur={() => setEditorForm((current) => ({ ...current, firstName: current.firstName.trim() }))}
+                        onChange={(event) => setEditorForm((current) => ({ ...current, firstName: event.target.value }))}
+                        placeholder="First name"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(editorForm.firstName, "First name")}
+                        aria-label="Copy first name"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
                   </label>
 
                   <label className={crmStyles.field}>
                     <span>Middle name</span>
-                    <input
-                      value={editorForm.middleName}
-                      onBlur={() => setEditorForm((current) => ({ ...current, middleName: current.middleName?.trim() }))}
-                      onChange={(event) => setEditorForm((current) => ({ ...current, middleName: event.target.value }))}
-                      placeholder="Middle name"
-                    />
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        value={editorForm.middleName}
+                        onBlur={() => setEditorForm((current) => ({ ...current, middleName: current.middleName?.trim() }))}
+                        onChange={(event) => setEditorForm((current) => ({ ...current, middleName: event.target.value }))}
+                        placeholder="Middle name"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(editorForm.middleName, "Middle name")}
+                        aria-label="Copy middle name"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
                   </label>
 
                   <label className={crmStyles.field}>
                     <span>Last name</span>
-                    <input
-                      value={editorForm.lastName}
-                      onBlur={() => setEditorForm((current) => ({ ...current, lastName: current.lastName.trim() }))}
-                      onChange={(event) => setEditorForm((current) => ({ ...current, lastName: event.target.value }))}
-                      placeholder="Last name"
-                    />
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        value={editorForm.lastName}
+                        onBlur={() => setEditorForm((current) => ({ ...current, lastName: current.lastName.trim() }))}
+                        onChange={(event) => setEditorForm((current) => ({ ...current, lastName: event.target.value }))}
+                        placeholder="Last name"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(editorForm.lastName, "Last name")}
+                        aria-label="Copy last name"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
                   </label>
 
                   <label className={crmStyles.field}>
@@ -428,16 +766,16 @@ export function LeadsShell() {
                   </div>
 
                   <label className={crmStyles.field}>
-                    <span>Lead source</span>
+                    <span>Tag</span>
                     <select
                       value={editorForm.source}
                       onChange={(event) => setEditorForm((current) => ({ ...current, source: event.target.value }))}
                     >
-                      <option>Users</option>
-                      <option>Referral</option>
-                      <option>Walk-in</option>
-                      <option>Website</option>
-                      <option>Phone call</option>
+                      {leadCategoryOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
                     </select>
                   </label>
 
@@ -461,61 +799,245 @@ export function LeadsShell() {
                 <div className={crmStyles.contactGrid}>
                   <label className={crmStyles.field}>
                     <span>Phone number</span>
-                    <input
-                      value={editorForm.phoneNumber}
-                      onBlur={() => setEditorForm((current) => ({ ...current, phoneNumber: current.phoneNumber.trim() }))}
-                      onChange={(event) => setEditorForm((current) => ({ ...current, phoneNumber: event.target.value }))}
-                      placeholder="(000) 000-0000"
-                    />
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        value={editorForm.phoneNumber}
+                        onBlur={() =>
+                          setEditorForm((current) => ({
+                            ...current,
+                            phoneNumber: formatPhoneNumber(current.phoneNumber.trim()),
+                          }))
+                        }
+                        onChange={(event) =>
+                          setEditorForm((current) => ({
+                            ...current,
+                            phoneNumber: formatPhoneNumber(event.target.value),
+                          }))
+                        }
+                        placeholder="(000) 000-0000"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(editorForm.phoneNumber, "Phone number")}
+                        aria-label="Copy phone number"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
                   </label>
 
                   <label className={crmStyles.field}>
                     <span>Email</span>
-                    <input
-                      type="email"
-                      value={editorForm.email}
-                      onBlur={() => setEditorForm((current) => ({ ...current, email: current.email?.trim() }))}
-                      onChange={(event) => setEditorForm((current) => ({ ...current, email: event.target.value }))}
-                      placeholder="client@email.com"
-                    />
+                    <div className={crmStyles.copyInputWrap}>
+                      <input
+                        type="email"
+                        value={editorForm.email}
+                        onBlur={() => setEditorForm((current) => ({ ...current, email: current.email?.trim() }))}
+                        onChange={(event) => setEditorForm((current) => ({ ...current, email: event.target.value }))}
+                        placeholder="client@email.com"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(editorForm.email, "Email")}
+                        aria-label="Copy email"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
                   </label>
 
                   <label className={crmStyles.fieldFull}>
                     <span>Address</span>
-                    <AddressAutocomplete
-                      value={editorForm.address ?? ""}
-                      onBlur={() => setEditorForm((current) => ({ ...current, address: current.address?.trim() }))}
-                      onChange={(address) => setEditorForm((current) => ({ ...current, address }))}
-                      placeholder="Address"
-                    />
+                    <div className={crmStyles.copyInputWrap}>
+                      <AddressAutocomplete
+                        value={editorForm.address ?? ""}
+                        onBlur={() => setEditorForm((current) => ({ ...current, address: current.address?.trim() }))}
+                        onChange={(address) => setEditorForm((current) => ({ ...current, address }))}
+                        placeholder="Address"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void copyLeadValue(editorForm.address, "Address")}
+                        aria-label="Copy address"
+                      >
+                        <Copy size={17} />
+                      </button>
+                    </div>
                   </label>
                 </div>
               </section>
 
+              {selectedLead ? (
+              <section className={crmStyles.intakeSectionStack}>
+                <div className={crmStyles.sectionTitleRow}>
+                  <h3>Logs</h3>
+                  <button type="button" onClick={addLeadLog} aria-label="Add lead log">
+                    <Plus size={19} />
+                  </button>
+                </div>
+                {leadLogMessage ? <p className={crmStyles.resourceMessage}>{leadLogMessage}</p> : null}
+                <div className={boardStyles.leadLogStack}>
+                  {editorLogs.map((log) => {
+                    const isCollapsed = collapsedLogs[log.id] ?? true;
+
+                    return (
+                      <article key={log.id} className={boardStyles.leadLogCard}>
+                        <div className={boardStyles.leadLogHeader}>
+                          <button
+                            type="button"
+                            onClick={() => setCollapsedLogs((current) => ({ ...current, [log.id]: !isCollapsed }))}
+                            aria-label={isCollapsed ? "Open log details" : "Close log details"}
+                          >
+                            {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                          </button>
+                          <input
+                            value={log.title}
+                            onChange={(event) =>
+                              setEditorLogs((current) =>
+                                current.map((item) => (item.id === log.id ? { ...item, title: event.target.value } : item))
+                              )
+                            }
+                            onBlur={(event) => void updateLeadLogDraft(log.id, { title: event.target.value })}
+                            placeholder="Log title"
+                          />
+                          <button type="button" onClick={() => void removeLeadLog(log.id)} aria-label="Delete log">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+
+                        {!isCollapsed ? (
+                          <div className={boardStyles.miniRichEditor}>
+                            <div aria-hidden="true">
+                              <button type="button">Sans Serif</button>
+                              <button type="button">Normal</button>
+                              <button type="button">B</button>
+                              <button type="button">I</button>
+                              <button type="button">U</button>
+                            </div>
+                            <textarea
+                              value={log.description ?? ""}
+                              onChange={(event) =>
+                                setEditorLogs((current) =>
+                                  current.map((item) =>
+                                    item.id === log.id ? { ...item, description: event.target.value } : item
+                                  )
+                                )
+                              }
+                              onBlur={(event) => void updateLeadLogDraft(log.id, { description: event.target.value })}
+                              placeholder="Type log details..."
+                            />
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+
+                  {editorLogs.length === 0 ? (
+                    <p className={boardStyles.leadEmptyState}>No logs for this lead yet.</p>
+                  ) : null}
+                </div>
+              </section>
+              ) : null}
+
+              {selectedLead ? (
               <LeadResources
                 leadId={selectedLead.id}
                 companies={editorCompanies}
                 files={editorFiles}
                 onCompaniesChange={setEditorCompanies}
                 onFilesChange={setEditorFiles}
+                sections={["files"]}
               />
+              ) : null}
 
+              {selectedLead ? (
               <section className={crmStyles.intakeSectionStack}>
                 <h3>Task log</h3>
-                <div className={crmStyles.taskLogPreview}>
-                  <span>Task Name</span>
-                  <span>Start Date</span>
-                  <span>Modified Date</span>
-                  <span>Status</span>
+                <div className={boardStyles.leadTaskLogStack}>
+                  {getLeadTaskEntries(selectedLead.id).map(({ laneId, laneTitle, task }) => {
+                    const draft = leadTaskDrafts[task.id] ?? {
+                      notes: task.notes,
+                      status: task.status === "done" ? "done" : "in_progress",
+                    };
+                    const isExpanded = expandedLeadTaskId === task.id;
+
+                    return (
+                      <article key={task.id} className={boardStyles.leadTaskLogCard}>
+                        <button type="button" onClick={() => toggleLeadTaskEditor(task)}>
+                          <div>
+                            <strong>{task.title}</strong>
+                            <span>{laneTitle}</span>
+                          </div>
+                          <small>{task.status === "done" ? "Done" : "In progress"}</small>
+                          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                        </button>
+
+                        {isExpanded ? (
+                          <div className={boardStyles.leadTaskEditor}>
+                            <label>
+                              <span>Status</span>
+                              <select
+                                value={draft.status}
+                                onChange={(event) =>
+                                  updateLeadTaskDraft(task.id, {
+                                    status: event.target.value === "done" ? "done" : "in_progress",
+                                  })
+                                }
+                              >
+                                <option value="in_progress">In progress</option>
+                                <option value="done">Done</option>
+                              </select>
+                            </label>
+                            <label>
+                              <span>Description</span>
+                              <div className={boardStyles.miniRichEditor}>
+                                <div aria-hidden="true">
+                                  <button type="button">Sans Serif</button>
+                                  <button type="button">Normal</button>
+                                  <button type="button">B</button>
+                                  <button type="button">I</button>
+                                  <button type="button">U</button>
+                                </div>
+                                <textarea
+                                  value={draft.notes}
+                                  onChange={(event) => updateLeadTaskDraft(task.id, { notes: event.target.value })}
+                                  placeholder="Task description"
+                                />
+                              </div>
+                            </label>
+                            <button type="button" onClick={() => void saveLeadTaskUpdate(laneId, task.id)}>
+                              Save task
+                            </button>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+
+                  {getLeadTaskEntries(selectedLead.id).length === 0 ? (
+                    <p className={boardStyles.leadEmptyState}>No tasks attached to this lead yet.</p>
+                  ) : null}
                 </div>
               </section>
+              ) : null}
+
+              {selectedLead ? (
+              <LeadResources
+                leadId={selectedLead.id}
+                companies={editorCompanies}
+                files={editorFiles}
+                onCompaniesChange={setEditorCompanies}
+                onFilesChange={setEditorFiles}
+                sections={["companies"]}
+              />
+              ) : null}
 
               <div className={crmStyles.modalActions}>
-                <button type="button" className={crmStyles.secondaryModalButton} onClick={() => setSelectedLead(null)}>
+                <button type="button" className={crmStyles.secondaryModalButton} onClick={closeLeadModal}>
                   Cancel
                 </button>
                 <button type="submit" className={crmStyles.primaryModalButton}>
-                  Save lead
+                  {selectedLead ? "Save lead" : "Create lead"}
                 </button>
               </div>
             </form>

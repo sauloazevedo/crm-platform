@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Copy, MoreVertical, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, GripVertical, MoreVertical, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import {
   createLeadLog,
   createLead as createLeadRequest,
@@ -1336,15 +1336,41 @@ export function BoardShell() {
             <article
               key={lane.id}
               className={styles.lane}
-              onDragOver={(event) => event.preventDefault()}
+              onDragOver={(event) => {
+                if (draggedLaneId) {
+                  event.preventDefault();
+                }
+              }}
+              onDrop={(event) => {
+                if (!draggedLaneId || draggedTask) {
+                  return;
+                }
+
+                event.preventDefault();
+                reorderLane(lane.id);
+              }}
             >
               <div
                 className={styles.laneHeader}
-                draggable
-                onDragStart={() => setDraggedLaneId(lane.id)}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => reorderLane(lane.id)}
               >
+                <button
+                  type="button"
+                  className={styles.dragLaneButton}
+                  draggable
+                  onDragStart={(event) => {
+                    event.stopPropagation();
+                    event.dataTransfer.effectAllowed = "move";
+                    setDraggedTask(null);
+                    setDraggedLaneId(lane.id);
+                  }}
+                  onDragEnd={() => setDraggedLaneId(null)}
+                  aria-label={`Move lane ${lane.title}`}
+                  title="Drag lane"
+                >
+                  <GripVertical size={15} strokeWidth={2} aria-hidden="true" />
+                </button>
                 <input
                   className={styles.laneTitle}
                   value={lane.title}
@@ -1394,8 +1420,11 @@ export function BoardShell() {
                         draggable
                         onDragStart={(event) => {
                           event.stopPropagation();
+                          event.dataTransfer.effectAllowed = "move";
+                          setDraggedLaneId(null);
                           setDraggedTask({ laneId: lane.id, taskId: task.id });
                         }}
+                        onDragEnd={() => setDraggedTask(null)}
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={(event) => {
                           event.stopPropagation();

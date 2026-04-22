@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { updateCurrentUserProfile } from "../lib/crm-api";
+import { inviteWorkspaceUser, updateCurrentUserProfile } from "../lib/crm-api";
 import { handleConfirmResetPassword, handleResetPassword } from "../services/auth";
 import { ThemeToggle } from "./theme-toggle";
 import styles from "./profile-shell.module.css";
@@ -47,8 +47,11 @@ export function ProfileShell() {
   const [hasRequestedPasswordCode, setHasRequestedPasswordCode] = useState(false);
   const [profileNotice, setProfileNotice] = useState<Notice | null>(null);
   const [passwordNotice, setPasswordNotice] = useState<Notice | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteNotice, setInviteNotice] = useState<Notice | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isInvitingUser, setIsInvitingUser] = useState(false);
 
   useEffect(() => {
     setFirstName(auth.user?.firstName ?? "");
@@ -148,6 +151,38 @@ export function ProfileShell() {
       setPasswordNotice({ tone: "error", message: "We could not reset your password. Check the code and try again." });
     } finally {
       setIsSavingPassword(false);
+    }
+  }
+
+  async function handleInviteSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const email = inviteEmail.trim().toLowerCase();
+    setInviteEmail(email);
+    setInviteNotice(null);
+
+    if (!email) {
+      setInviteNotice({ tone: "error", message: "Invite email is required." });
+      return;
+    }
+
+    setIsInvitingUser(true);
+
+    try {
+      await inviteWorkspaceUser({ email });
+      setInviteEmail("");
+      setInviteNotice({
+        tone: "success",
+        message: `Invitation sent to ${email}. The user will receive a temporary password by email.`,
+      });
+    } catch (error) {
+      console.warn("[ProfileShell] invite user failed:", error);
+      setInviteNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "We could not invite this user right now.",
+      });
+    } finally {
+      setIsInvitingUser(false);
     }
   }
 
@@ -290,6 +325,38 @@ export function ProfileShell() {
                 {passwordNotice.message}
               </p>
             ) : null}
+          </form>
+
+          <form className={styles.card} onSubmit={handleInviteSubmit}>
+            <div>
+              <p className={styles.cardEyebrow}>Workspace access</p>
+              <h2>Invite a team member</h2>
+              <p className={styles.cardCopy}>
+                Invite another user into this same dashboard. They will receive a temporary password and must create
+                a new password on first login.
+              </p>
+            </div>
+
+            <label className={styles.field}>
+              <span>Invite email</span>
+              <input
+                type="email"
+                value={inviteEmail}
+                onBlur={() => setInviteEmail(inviteEmail.trim().toLowerCase())}
+                onChange={(event) => setInviteEmail(event.target.value)}
+                placeholder="team@office.com"
+              />
+            </label>
+
+            {inviteNotice ? (
+              <p className={inviteNotice.tone === "success" ? styles.successNotice : styles.errorNotice}>
+                {inviteNotice.message}
+              </p>
+            ) : null}
+
+            <button className={styles.primaryButton} type="submit" disabled={isInvitingUser}>
+              {isInvitingUser ? "Sending invite..." : "Invite user"}
+            </button>
           </form>
         </div>
       </section>
