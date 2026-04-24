@@ -41,6 +41,22 @@ import styles from "./leads-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
 
 type TaskStatus = "in_progress" | "done";
+type WalletDraftItem = {
+  id: string;
+  description: string;
+  cost: string;
+  revenue: string;
+};
+
+const defaultWalletItems: WalletDraftItem[] = [
+  { id: "wallet-primary", description: "", cost: "", revenue: "" },
+  {
+    id: "wallet-office-expenses",
+    description: "Office expenses (printer and ink)",
+    cost: "12",
+    revenue: "",
+  },
+];
 
 const emptyEditor: UpdateLeadInput = {
   firstName: "",
@@ -98,6 +114,56 @@ function parseMoney(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(value);
+}
+
+function toWalletDraftItems(
+  items?: Array<{ id: string; description: string; cost: number; revenue: number }>
+) {
+  if (!items || items.length === 0) {
+    return defaultWalletItems.map((item) => ({ ...item }));
+  }
+
+  return items.map((item) => ({
+    id: item.id,
+    description: item.description,
+    cost: item.cost ? String(item.cost) : "",
+    revenue: item.revenue ? String(item.revenue) : "",
+  }));
+}
+
+function toWalletItems(items: WalletDraftItem[], fallbackTitle: string) {
+  return items
+    .map((item, index) => ({
+      id: item.id || `wallet-${index + 1}`,
+      description: item.description.trim() || (index === 0 ? fallbackTitle : ""),
+      cost: parseMoney(item.cost),
+      revenue: parseMoney(item.revenue),
+    }))
+    .filter((item) => item.description || item.cost > 0 || item.revenue > 0);
+}
+
+function getWalletTotals(items: WalletDraftItem[]) {
+  const totals = items.reduce(
+    (current, item) => ({
+      cost: current.cost + parseMoney(item.cost),
+      revenue: current.revenue + parseMoney(item.revenue),
+    }),
+    { cost: 0, revenue: 0 }
+  );
+  const margin = totals.revenue - totals.cost;
+
+  return {
+    ...totals,
+    margin,
+    marginPercent: totals.revenue > 0 ? (margin / totals.revenue) * 100 : 0,
+  };
+}
+
 function formatTagLabel(value?: string | null) {
   if (!value?.trim()) {
     return "Lead";
@@ -118,7 +184,9 @@ export function LeadsShell() {
   const [editorInvoices, setEditorInvoices] = useState<LeadInvoiceRecord[]>([]);
   const [collapsedLogs, setCollapsedLogs] = useState<Record<string, boolean>>({});
   const [expandedLeadTaskId, setExpandedLeadTaskId] = useState<string | null>(null);
-  const [leadTaskDrafts, setLeadTaskDrafts] = useState<Record<string, { notes: string; status: TaskStatus }>>({});
+  const [leadTaskDrafts, setLeadTaskDrafts] = useState<
+    Record<string, { notes: string; status: TaskStatus; walletItems: WalletDraftItem[] }>
+  >({});
   const [taskBoard, setTaskBoard] = useState<TaskBoardLane[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [nameSearch, setNameSearch] = useState("");
@@ -406,18 +474,85 @@ export function LeadsShell() {
       [task.id]: current[task.id] ?? {
         notes: task.notes,
         status: task.status === "done" ? "done" : "in_progress",
+        walletItems: toWalletDraftItems(task.walletItems),
       },
     }));
   }
 
-  function updateLeadTaskDraft(taskId: string, patch: Partial<{ notes: string; status: TaskStatus }>) {
+  function updateLeadTaskDraft(
+    taskId: string,
+    patch: Partial<{ notes: string; status: TaskStatus; walletItems: WalletDraftItem[] }>
+  ) {
     setLeadTaskDrafts((current) => ({
       ...current,
       [taskId]: {
-        ...(current[taskId] ?? { notes: "", status: "in_progress" }),
+        ...(current[taskId] ?? { notes: "", status: "in_progress", walletItems: defaultWalletItems.map((item) => ({ ...item })) }),
         ...patch,
       },
     }));
+  }
+
+  function updateLeadTaskWalletItem(
+    taskId: string,
+    itemId: string,
+    field: keyof Omit<WalletDraftItem, "id">,
+    value: string
+  ) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+      };
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          walletItems: draft.walletItems.map((item) => (item.id === itemId ? { ...item, [field]: value } : item)),
+        },
+      };
+    });
+  }
+
+  function addLeadTaskWalletItem(taskId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+      };
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          walletItems: [
+            ...draft.walletItems,
+            { id: `wallet-${crypto.randomUUID()}`, description: "", cost: "", revenue: "" },
+          ],
+        },
+      };
+    });
+  }
+
+  function removeLeadTaskWalletItem(taskId: string, itemId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+      };
+      const nextWalletItems = draft.walletItems.filter((item) => item.id !== itemId);
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          walletItems: nextWalletItems.length > 0 ? nextWalletItems : [{ id: "wallet-primary", description: "", cost: "", revenue: "" }],
+        },
+      };
+    });
   }
 
   async function saveLeadTaskUpdate(laneId: string, taskId: string) {
@@ -437,6 +572,7 @@ export function LeadsShell() {
                     ...task,
                     notes: draft.notes.trim(),
                     status: draft.status,
+                    walletItems: toWalletItems(draft.walletItems, task.title),
                   }
                 : task
             ),
@@ -548,7 +684,7 @@ export function LeadsShell() {
       setEditorInvoices((current) => [response.invoice, ...current]);
     } catch (error) {
       console.warn("[LeadsShell] failed to create invoice:", error);
-      setLeadWalletMessage("We could not create this invoice yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not create this invoice yet.");
     }
   }
 
@@ -584,7 +720,7 @@ export function LeadsShell() {
       );
     } catch (error) {
       console.warn("[LeadsShell] failed to update invoice:", error);
-      setLeadWalletMessage("We could not save this invoice yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not save this invoice yet.");
     }
   }
 
@@ -600,7 +736,7 @@ export function LeadsShell() {
       await deleteLeadInvoice(selectedLead.id, invoiceId);
     } catch (error) {
       console.warn("[LeadsShell] failed to delete invoice:", error);
-      setLeadWalletMessage("We could not delete this invoice yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not delete this invoice yet.");
     }
   }
 
@@ -629,7 +765,7 @@ export function LeadsShell() {
       );
     } catch (error) {
       console.warn("[LeadsShell] failed to create installment:", error);
-      setLeadWalletMessage("We could not create this installment yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not create this installment yet.");
     }
   }
 
@@ -685,7 +821,7 @@ export function LeadsShell() {
       );
     } catch (error) {
       console.warn("[LeadsShell] failed to update installment:", error);
-      setLeadWalletMessage("We could not save this installment yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not save this installment yet.");
     }
   }
 
@@ -710,7 +846,7 @@ export function LeadsShell() {
       await deleteLeadInstallment(selectedLead.id, invoiceId, installmentId);
     } catch (error) {
       console.warn("[LeadsShell] failed to delete installment:", error);
-      setLeadWalletMessage("We could not delete this installment yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not delete this installment yet.");
     }
   }
 
@@ -1178,6 +1314,7 @@ export function LeadsShell() {
                     const draft = leadTaskDrafts[task.id] ?? {
                       notes: task.notes,
                       status: task.status === "done" ? "done" : "in_progress",
+                      walletItems: toWalletDraftItems(task.walletItems),
                     };
                     const isExpanded = expandedLeadTaskId === task.id;
 
@@ -1225,39 +1362,70 @@ export function LeadsShell() {
                                 />
                               </div>
                             </label>
-                            <div className={boardStyles.taskWalletSummary}>
-                              <div>
-                                <span>Cost</span>
-                                <strong>
-                                  $
-                                  {(task.walletItems ?? [])
-                                    .reduce((sum, item) => sum + parseMoney(item.cost), 0)
-                                    .toFixed(2)}
-                                </strong>
+                            <section className={boardStyles.walletPanel}>
+                              <div className={boardStyles.walletHeader}>
+                                <h3>Wallet</h3>
+                                <button type="button" onClick={() => addLeadTaskWalletItem(task.id)}>
+                                  + New
+                                </button>
                               </div>
-                              <div>
-                                <span>Revenue</span>
-                                <strong>
-                                  $
-                                  {(task.walletItems ?? [])
-                                    .reduce((sum, item) => sum + parseMoney(item.revenue), 0)
-                                    .toFixed(2)}
-                                </strong>
+
+                              <div className={boardStyles.walletRows}>
+                                {draft.walletItems.map((item, index) => (
+                                  <div key={item.id} className={boardStyles.walletRow}>
+                                    <input
+                                      value={item.description || (index === 0 ? task.title : "")}
+                                      onChange={(event) =>
+                                        updateLeadTaskWalletItem(task.id, item.id, "description", event.target.value)
+                                      }
+                                      placeholder={index === 0 ? task.title || "Task name" : "Description"}
+                                    />
+                                    <input
+                                      inputMode="decimal"
+                                      value={item.cost}
+                                      onChange={(event) =>
+                                        updateLeadTaskWalletItem(task.id, item.id, "cost", event.target.value)
+                                      }
+                                      placeholder="Cost"
+                                    />
+                                    <input
+                                      inputMode="decimal"
+                                      value={item.revenue}
+                                      onChange={(event) =>
+                                        updateLeadTaskWalletItem(task.id, item.id, "revenue", event.target.value)
+                                      }
+                                      placeholder="Revenue"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => removeLeadTaskWalletItem(task.id, item.id)}
+                                      aria-label="Remove wallet row"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                ))}
                               </div>
-                            </div>
-                            <div className={boardStyles.taskWalletRows}>
-                              {(task.walletItems ?? []).map((item) => (
-                                <div key={item.id} className={boardStyles.taskWalletRow}>
-                                  <span>{item.description || "Wallet item"}</span>
-                                  <strong>
-                                    ${parseMoney(item.cost).toFixed(2)} / ${parseMoney(item.revenue).toFixed(2)}
-                                  </strong>
+
+                              <div className={boardStyles.walletTotals}>
+                                <div>
+                                  <span>Total cost</span>
+                                  <strong>{formatMoney(getWalletTotals(draft.walletItems).cost)}</strong>
                                 </div>
-                              ))}
-                              {(task.walletItems ?? []).length === 0 ? (
-                                <p className={boardStyles.leadEmptyState}>No wallet entries for this task yet.</p>
-                              ) : null}
-                            </div>
+                                <div>
+                                  <span>Revenue</span>
+                                  <strong>{formatMoney(getWalletTotals(draft.walletItems).revenue)}</strong>
+                                </div>
+                                <div>
+                                  <span>Margin</span>
+                                  <strong>{formatMoney(getWalletTotals(draft.walletItems).margin)}</strong>
+                                </div>
+                                <div>
+                                  <span>Margin %</span>
+                                  <strong>{getWalletTotals(draft.walletItems).marginPercent.toFixed(1)}%</strong>
+                                </div>
+                              </div>
+                            </section>
                             <button type="button" onClick={() => void saveLeadTaskUpdate(laneId, task.id)}>
                               Save task
                             </button>

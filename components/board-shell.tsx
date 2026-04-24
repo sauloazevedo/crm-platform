@@ -304,7 +304,9 @@ export function BoardShell() {
   const [leadEditorInvoices, setLeadEditorInvoices] = useState<LeadInvoiceRecord[]>([]);
   const [collapsedLogs, setCollapsedLogs] = useState<Record<string, boolean>>({});
   const [expandedLeadTaskId, setExpandedLeadTaskId] = useState<string | null>(null);
-  const [leadTaskDrafts, setLeadTaskDrafts] = useState<Record<string, { notes: string; status: TaskStatus }>>({});
+  const [leadTaskDrafts, setLeadTaskDrafts] = useState<
+    Record<string, { notes: string; status: TaskStatus; walletItems: WalletDraftItem[] }>
+  >({});
   const [leadLogMessage, setLeadLogMessage] = useState<string | null>(null);
   const [leadWalletMessage, setLeadWalletMessage] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
@@ -630,18 +632,92 @@ export function BoardShell() {
       [task.id]: current[task.id] ?? {
         notes: task.notes,
         status: task.status,
+        walletItems: toWalletDraftItems(task.walletItems),
       },
     }));
   }
 
-  function updateLeadTaskDraft(taskId: string, patch: Partial<{ notes: string; status: TaskStatus }>) {
+  function updateLeadTaskDraft(
+    taskId: string,
+    patch: Partial<{ notes: string; status: TaskStatus; walletItems: WalletDraftItem[] }>
+  ) {
     setLeadTaskDrafts((current) => ({
       ...current,
       [taskId]: {
-        ...(current[taskId] ?? { notes: "", status: "in_progress" }),
+        ...(current[taskId] ?? {
+          notes: "",
+          status: "in_progress",
+          walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        }),
         ...patch,
       },
     }));
+  }
+
+  function updateLeadTaskWalletItem(
+    taskId: string,
+    itemId: string,
+    field: keyof Omit<WalletDraftItem, "id">,
+    value: string
+  ) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+      };
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          walletItems: draft.walletItems.map((item) => (item.id === itemId ? { ...item, [field]: value } : item)),
+        },
+      };
+    });
+  }
+
+  function addLeadTaskWalletItem(taskId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+      };
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          walletItems: [
+            ...draft.walletItems,
+            { id: `wallet-${crypto.randomUUID()}`, description: "", cost: "", revenue: "" },
+          ],
+        },
+      };
+    });
+  }
+
+  function removeLeadTaskWalletItem(taskId: string, itemId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+      };
+      const nextWalletItems = draft.walletItems.filter((item) => item.id !== itemId);
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          walletItems:
+            nextWalletItems.length > 0
+              ? nextWalletItems
+              : [{ id: "wallet-primary", description: "", cost: "", revenue: "" }],
+        },
+      };
+    });
   }
 
   function saveLeadTaskUpdate(laneId: string, taskId: string) {
@@ -661,6 +737,7 @@ export function BoardShell() {
                     ...task,
                     notes: draft.notes.trim(),
                     status: draft.status,
+                    walletItems: toWalletItems(draft.walletItems, task.title),
                   }
                 : task
             ),
@@ -765,7 +842,7 @@ export function BoardShell() {
       setLeadEditorInvoices((current) => [response.invoice, ...current]);
     } catch (error) {
       console.warn("[BoardShell] failed to create invoice:", error);
-      setLeadWalletMessage("We could not create this invoice yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not create this invoice yet.");
     }
   }
 
@@ -803,7 +880,7 @@ export function BoardShell() {
       );
     } catch (error) {
       console.warn("[BoardShell] failed to update invoice:", error);
-      setLeadWalletMessage("We could not save this invoice yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not save this invoice yet.");
     }
   }
 
@@ -819,7 +896,7 @@ export function BoardShell() {
       await deleteLeadInvoice(selectedLead.id, invoiceId);
     } catch (error) {
       console.warn("[BoardShell] failed to delete invoice:", error);
-      setLeadWalletMessage("We could not delete this invoice yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not delete this invoice yet.");
     }
   }
 
@@ -848,7 +925,7 @@ export function BoardShell() {
       );
     } catch (error) {
       console.warn("[BoardShell] failed to create installment:", error);
-      setLeadWalletMessage("We could not create this installment yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not create this installment yet.");
     }
   }
 
@@ -904,7 +981,7 @@ export function BoardShell() {
       );
     } catch (error) {
       console.warn("[BoardShell] failed to update installment:", error);
-      setLeadWalletMessage("We could not save this installment yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not save this installment yet.");
     }
   }
 
@@ -929,7 +1006,7 @@ export function BoardShell() {
       await deleteLeadInstallment(selectedLead.id, invoiceId, installmentId);
     } catch (error) {
       console.warn("[BoardShell] failed to delete installment:", error);
-      setLeadWalletMessage("We could not delete this installment yet.");
+      setLeadWalletMessage(error instanceof Error ? error.message : "We could not delete this installment yet.");
     }
   }
 
@@ -2494,7 +2571,11 @@ export function BoardShell() {
                 <h3>Task log</h3>
                 <div className={styles.leadTaskLogStack}>
                   {getLeadTaskEntries(selectedLead.id).map(({ laneId, laneTitle, task }) => {
-                    const draft = leadTaskDrafts[task.id] ?? { notes: task.notes, status: task.status };
+                    const draft = leadTaskDrafts[task.id] ?? {
+                      notes: task.notes,
+                      status: task.status,
+                      walletItems: toWalletDraftItems(task.walletItems),
+                    };
                     const isExpanded = expandedLeadTaskId === task.id;
 
                     return (
@@ -2541,39 +2622,14 @@ export function BoardShell() {
                                 />
                               </div>
                             </label>
-                            <div className={styles.taskWalletSummary}>
-                              <div>
-                                <span>Cost</span>
-                                <strong>
-                                  $
-                                  {(task.walletItems ?? [])
-                                    .reduce((sum, item) => sum + Number(item.cost ?? 0), 0)
-                                    .toFixed(2)}
-                                </strong>
-                              </div>
-                              <div>
-                                <span>Revenue</span>
-                                <strong>
-                                  $
-                                  {(task.walletItems ?? [])
-                                    .reduce((sum, item) => sum + Number(item.revenue ?? 0), 0)
-                                    .toFixed(2)}
-                                </strong>
-                              </div>
-                            </div>
-                            <div className={styles.taskWalletRows}>
-                              {(task.walletItems ?? []).map((item) => (
-                                <div key={item.id} className={styles.taskWalletRow}>
-                                  <span>{item.description || "Wallet item"}</span>
-                                  <strong>
-                                    ${Number(item.cost ?? 0).toFixed(2)} / ${Number(item.revenue ?? 0).toFixed(2)}
-                                  </strong>
-                                </div>
-                              ))}
-                              {(task.walletItems ?? []).length === 0 ? (
-                                <p className={styles.leadEmptyState}>No wallet entries for this task yet.</p>
-                              ) : null}
-                            </div>
+                            {renderWalletEditor({
+                              items: draft.walletItems,
+                              title: task.title,
+                              onUpdate: (itemId, field, value) =>
+                                updateLeadTaskWalletItem(task.id, itemId, field, value),
+                              onAdd: () => addLeadTaskWalletItem(task.id),
+                              onRemove: (itemId) => removeLeadTaskWalletItem(task.id, itemId),
+                            })}
                             <button type="button" onClick={() => saveLeadTaskUpdate(laneId, task.id)}>
                               Save task
                             </button>

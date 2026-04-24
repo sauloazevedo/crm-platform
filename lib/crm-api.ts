@@ -1,5 +1,10 @@
 import { getAuthHeaders } from "./authHeaders";
 
+async function readApiError(response: Response, fallback: string) {
+  const errorBody = await response.json().catch(() => null);
+  return errorBody?.message || fallback;
+}
+
 function getApiBaseUrl(): string {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -545,7 +550,7 @@ export async function createLeadInvoice(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create lead invoice: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to create lead invoice: ${response.status}`));
   }
 
   return response.json();
@@ -565,7 +570,7 @@ export async function updateLeadInvoice(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update lead invoice: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to update lead invoice: ${response.status}`));
   }
 
   return response.json();
@@ -580,7 +585,7 @@ export async function deleteLeadInvoice(leadId: string, invoiceId: string): Prom
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to delete lead invoice: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to delete lead invoice: ${response.status}`));
   }
 
   return response.json();
@@ -600,7 +605,7 @@ export async function createLeadInstallment(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create installment: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to create installment: ${response.status}`));
   }
 
   return response.json();
@@ -624,7 +629,7 @@ export async function updateLeadInstallment(
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to update installment: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to update installment: ${response.status}`));
   }
 
   return response.json();
@@ -646,7 +651,7 @@ export async function deleteLeadInstallment(
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to delete installment: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to delete installment: ${response.status}`));
   }
 
   return response.json();
