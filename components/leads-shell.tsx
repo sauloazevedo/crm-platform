@@ -5,17 +5,26 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Copy, Filter, Mail, Phone, Plus, Trash2 } from "lucide-react";
 import {
   createLead,
+  createLeadInstallment,
+  createLeadInvoice,
   createLeadLog,
+  deleteLeadInstallment,
+  deleteLeadInvoice,
   deleteLead,
   deleteLeadLog,
   getLeadCompanies,
   getLeadFiles,
+  getLeadInvoices,
   getLeadLogs,
   getLeads,
   getTaskBoard,
   saveTaskBoard,
+  updateLeadInstallment,
+  updateLeadInvoice,
   updateLeadLog,
   updateLead,
+  type LeadInstallmentRecord,
+  type LeadInvoiceRecord,
   type LeadCompanyRecord,
   type LeadFileRecord,
   type LeadLogRecord,
@@ -24,6 +33,7 @@ import {
   type UpdateLeadInput,
 } from "../lib/crm-api";
 import { LeadResources } from "./lead-resources";
+import { LeadWalletPanel } from "./lead-wallet-panel";
 import { AddressAutocomplete } from "./address-autocomplete";
 import { compressImageFile } from "../lib/image-compression";
 import boardStyles from "./board-shell.module.css";
@@ -83,6 +93,11 @@ function formatPhoneNumber(value?: string | null) {
   return value ?? "";
 }
 
+function parseMoney(value: unknown) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function formatTagLabel(value?: string | null) {
   if (!value?.trim()) {
     return "Lead";
@@ -100,6 +115,7 @@ export function LeadsShell() {
   const [editorCompanies, setEditorCompanies] = useState<LeadCompanyRecord[]>([]);
   const [editorFiles, setEditorFiles] = useState<Array<LeadFileRecord & { fileDataBase64?: string }>>([]);
   const [editorLogs, setEditorLogs] = useState<LeadLogRecord[]>([]);
+  const [editorInvoices, setEditorInvoices] = useState<LeadInvoiceRecord[]>([]);
   const [collapsedLogs, setCollapsedLogs] = useState<Record<string, boolean>>({});
   const [expandedLeadTaskId, setExpandedLeadTaskId] = useState<string | null>(null);
   const [leadTaskDrafts, setLeadTaskDrafts] = useState<Record<string, { notes: string; status: TaskStatus }>>({});
@@ -113,6 +129,7 @@ export function LeadsShell() {
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
   const [leadLogMessage, setLeadLogMessage] = useState<string | null>(null);
+  const [leadWalletMessage, setLeadWalletMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -206,6 +223,7 @@ export function LeadsShell() {
     setCopyFeedback(null);
     setPhotoFeedback(null);
     setLeadLogMessage(null);
+    setLeadWalletMessage(null);
     setExpandedLeadTaskId(null);
     setLeadTaskDrafts({});
     setEditorForm({
@@ -226,20 +244,23 @@ export function LeadsShell() {
     });
 
     try {
-      const [companiesResponse, filesResponse, logsResponse] = await Promise.all([
+      const [companiesResponse, filesResponse, logsResponse, invoicesResponse] = await Promise.all([
         getLeadCompanies(lead.id),
         getLeadFiles(lead.id),
         getLeadLogs(lead.id),
+        getLeadInvoices(lead.id),
       ]);
 
       setEditorCompanies(companiesResponse.companies);
       setEditorFiles(filesResponse.files);
       setEditorLogs(logsResponse.logs);
+      setEditorInvoices(invoicesResponse.invoices);
     } catch (error) {
       console.warn("[LeadsShell] failed to load lead resources:", error);
       setEditorCompanies([]);
       setEditorFiles([]);
       setEditorLogs([]);
+      setEditorInvoices([]);
     }
   }
 
@@ -249,12 +270,14 @@ export function LeadsShell() {
     setCopyFeedback(null);
     setPhotoFeedback(null);
     setLeadLogMessage(null);
+    setLeadWalletMessage(null);
     setExpandedLeadTaskId(null);
     setLeadTaskDrafts({});
     setEditorForm(emptyEditor);
     setEditorCompanies([]);
     setEditorFiles([]);
     setEditorLogs([]);
+    setEditorInvoices([]);
   }
 
   function closeLeadModal() {
@@ -263,8 +286,10 @@ export function LeadsShell() {
     setCopyFeedback(null);
     setPhotoFeedback(null);
     setLeadLogMessage(null);
+    setLeadWalletMessage(null);
     setExpandedLeadTaskId(null);
     setLeadTaskDrafts({});
+    setEditorInvoices([]);
   }
 
   function formatTaxId(value: string) {
@@ -491,6 +516,201 @@ export function LeadsShell() {
     } catch (error) {
       console.warn("[LeadsShell] failed to delete lead log:", error);
       setLeadLogMessage("We could not delete this log yet.");
+    }
+  }
+
+  async function addLeadInvoice() {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    const linkedTasks = getLeadTaskEntries(selectedLead.id)
+      .filter(({ task }) => task.status !== "done")
+      .map(({ task }) => task.id);
+    const suggestedAmount = getLeadTaskEntries(selectedLead.id)
+      .filter(({ task }) => task.status !== "done")
+      .reduce((sum, { task }) => {
+        const revenue = (task.walletItems ?? []).reduce((walletSum, item) => walletSum + parseMoney(item.revenue), 0);
+        return sum + revenue;
+      }, 0);
+
+    try {
+      const response = await createLeadInvoice(selectedLead.id, {
+        title: `${fullName(selectedLead) || "Lead"} invoice ${editorInvoices.length + 1}`,
+        amount: suggestedAmount,
+        status: "pending",
+        issuedAt: new Date().toISOString().slice(0, 10),
+        dueDate: "",
+        notes: "",
+        sourceTaskIds: linkedTasks,
+      });
+      setEditorInvoices((current) => [response.invoice, ...current]);
+    } catch (error) {
+      console.warn("[LeadsShell] failed to create invoice:", error);
+      setLeadWalletMessage("We could not create this invoice yet.");
+    }
+  }
+
+  async function updateInvoiceDraft(invoiceId: string, patch: Partial<LeadInvoiceRecord>) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    const nextInvoices = editorInvoices.map((invoice) => (invoice.id === invoiceId ? { ...invoice, ...patch } : invoice));
+    setEditorInvoices(nextInvoices);
+
+    const nextInvoice = nextInvoices.find((invoice) => invoice.id === invoiceId);
+
+    if (!nextInvoice) {
+      return;
+    }
+
+    try {
+      const response = await updateLeadInvoice(selectedLead.id, invoiceId, {
+        title: nextInvoice.title.trim() || "Invoice",
+        amount: parseMoney(nextInvoice.amount),
+        status: nextInvoice.status,
+        dueDate: nextInvoice.dueDate ?? "",
+        issuedAt: nextInvoice.issuedAt ?? "",
+        notes: nextInvoice.notes ?? "",
+        sourceTaskIds: nextInvoice.sourceTaskIds ?? [],
+      });
+      setEditorInvoices((current) =>
+        current.map((invoice) =>
+          invoice.id === invoiceId ? { ...response.invoice, installments: invoice.installments } : invoice
+        )
+      );
+    } catch (error) {
+      console.warn("[LeadsShell] failed to update invoice:", error);
+      setLeadWalletMessage("We could not save this invoice yet.");
+    }
+  }
+
+  async function removeInvoice(invoiceId: string) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    setEditorInvoices((current) => current.filter((invoice) => invoice.id !== invoiceId));
+
+    try {
+      await deleteLeadInvoice(selectedLead.id, invoiceId);
+    } catch (error) {
+      console.warn("[LeadsShell] failed to delete invoice:", error);
+      setLeadWalletMessage("We could not delete this invoice yet.");
+    }
+  }
+
+  async function addInstallment(invoiceId: string) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    const invoice = editorInvoices.find((item) => item.id === invoiceId);
+
+    if (!invoice) {
+      return;
+    }
+
+    try {
+      const response = await createLeadInstallment(selectedLead.id, invoiceId, {
+        amount: parseMoney(invoice.amount),
+        dueDate: invoice.dueDate ?? "",
+        status: "pending",
+      });
+      setEditorInvoices((current) =>
+        current.map((item) =>
+          item.id === invoiceId ? { ...item, installments: [...item.installments, response.installment] } : item
+        )
+      );
+    } catch (error) {
+      console.warn("[LeadsShell] failed to create installment:", error);
+      setLeadWalletMessage("We could not create this installment yet.");
+    }
+  }
+
+  async function updateInstallmentDraft(
+    invoiceId: string,
+    installmentId: string,
+    patch: Partial<LeadInstallmentRecord>
+  ) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    const nextInvoices = editorInvoices.map((invoice) =>
+      invoice.id === invoiceId
+        ? {
+            ...invoice,
+            installments: invoice.installments.map((installment) =>
+              installment.id === installmentId ? { ...installment, ...patch } : installment
+            ),
+          }
+        : invoice
+    );
+    setEditorInvoices(nextInvoices);
+
+    const nextInvoice = nextInvoices.find((invoice) => invoice.id === invoiceId);
+    const nextInstallment = nextInvoice?.installments.find((installment) => installment.id === installmentId);
+
+    if (!nextInstallment) {
+      return;
+    }
+
+    try {
+      const response = await updateLeadInstallment(selectedLead.id, invoiceId, installmentId, {
+        amount: parseMoney(nextInstallment.amount),
+        dueDate: nextInstallment.dueDate ?? "",
+        status: nextInstallment.status,
+        paidAt: nextInstallment.paidAt ?? "",
+        paymentMethod: nextInstallment.paymentMethod ?? "",
+        notes: nextInstallment.notes ?? "",
+      });
+      setEditorInvoices((current) =>
+        current.map((invoice) =>
+          invoice.id === invoiceId
+            ? {
+                ...invoice,
+                installments: invoice.installments.map((installment) =>
+                  installment.id === installmentId ? response.installment : installment
+                ),
+              }
+            : invoice
+        )
+      );
+    } catch (error) {
+      console.warn("[LeadsShell] failed to update installment:", error);
+      setLeadWalletMessage("We could not save this installment yet.");
+    }
+  }
+
+  async function removeInstallment(invoiceId: string, installmentId: string) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    setEditorInvoices((current) =>
+      current.map((invoice) =>
+        invoice.id === invoiceId
+          ? {
+              ...invoice,
+              installments: invoice.installments.filter((installment) => installment.id !== installmentId),
+            }
+          : invoice
+      )
+    );
+
+    try {
+      await deleteLeadInstallment(selectedLead.id, invoiceId, installmentId);
+    } catch (error) {
+      console.warn("[LeadsShell] failed to delete installment:", error);
+      setLeadWalletMessage("We could not delete this installment yet.");
     }
   }
 
@@ -1005,6 +1225,39 @@ export function LeadsShell() {
                                 />
                               </div>
                             </label>
+                            <div className={boardStyles.taskWalletSummary}>
+                              <div>
+                                <span>Cost</span>
+                                <strong>
+                                  $
+                                  {(task.walletItems ?? [])
+                                    .reduce((sum, item) => sum + parseMoney(item.cost), 0)
+                                    .toFixed(2)}
+                                </strong>
+                              </div>
+                              <div>
+                                <span>Revenue</span>
+                                <strong>
+                                  $
+                                  {(task.walletItems ?? [])
+                                    .reduce((sum, item) => sum + parseMoney(item.revenue), 0)
+                                    .toFixed(2)}
+                                </strong>
+                              </div>
+                            </div>
+                            <div className={boardStyles.taskWalletRows}>
+                              {(task.walletItems ?? []).map((item) => (
+                                <div key={item.id} className={boardStyles.taskWalletRow}>
+                                  <span>{item.description || "Wallet item"}</span>
+                                  <strong>
+                                    ${parseMoney(item.cost).toFixed(2)} / ${parseMoney(item.revenue).toFixed(2)}
+                                  </strong>
+                                </div>
+                              ))}
+                              {(task.walletItems ?? []).length === 0 ? (
+                                <p className={boardStyles.leadEmptyState}>No wallet entries for this task yet.</p>
+                              ) : null}
+                            </div>
                             <button type="button" onClick={() => void saveLeadTaskUpdate(laneId, task.id)}>
                               Save task
                             </button>
@@ -1030,6 +1283,21 @@ export function LeadsShell() {
                 onFilesChange={setEditorFiles}
                 sections={["companies"]}
               />
+              ) : null}
+
+              {selectedLead ? (
+                <LeadWalletPanel
+                  leadName={fullName(selectedLead)}
+                  tasks={getLeadTaskEntries(selectedLead.id).map(({ task }) => task)}
+                  invoices={editorInvoices}
+                  message={leadWalletMessage}
+                  onAddInvoice={addLeadInvoice}
+                  onUpdateInvoice={updateInvoiceDraft}
+                  onDeleteInvoice={removeInvoice}
+                  onAddInstallment={addInstallment}
+                  onUpdateInstallment={updateInstallmentDraft}
+                  onDeleteInstallment={removeInstallment}
+                />
               ) : null}
 
               <div className={crmStyles.modalActions}>

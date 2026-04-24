@@ -180,6 +180,7 @@
 }
 
 .lane {
+  position: relative;
   flex: 0 0 min(360px, calc(100vw - 54px));
   min-width: 0;
   max-width: 360px;
@@ -193,6 +194,7 @@
   background: var(--surface);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: var(--shadow);
+  transition: background-color 180ms ease;
 }
 
 .laneHeader {
@@ -287,6 +289,50 @@
   background: rgba(75, 242, 226, 0.14);
   color: white;
   transform: translateY(-1px);
+}
+
+.laneColorPopover {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(8, 21, 38, 0.96);
+  box-shadow: var(--shadow);
+}
+
+.laneColorField {
+  display: grid;
+  gap: 6px;
+}
+
+.laneColorField span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.laneColorField input[type="color"] {
+  width: 100%;
+  min-height: 38px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.laneColorField input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.laneColorActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .taskList {
@@ -1116,6 +1162,200 @@
   color: var(--muted);
 }
 
+.sectionTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sectionTitleRow > div {
+  display: grid;
+  gap: 4px;
+}
+
+.sectionTitleRow button,
+.installmentsHeader button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.walletLeadSection {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.walletSectionHint,
+.walletSectionMessage {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.walletSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.walletSummaryGrid article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(75, 242, 226, 0.2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.walletSummaryGrid span,
+.invoiceMetaRow span,
+.invoiceNotesField span,
+.invoiceGrid span,
+.installmentsHeader h4,
+.taskWalletSummary span,
+.taskWalletRow span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.walletSummaryGrid strong,
+.taskWalletSummary strong,
+.taskWalletRow strong {
+  color: var(--text);
+  font-size: 0.98rem;
+}
+
+.invoiceStack {
+  display: grid;
+  gap: 12px;
+}
+
+.invoiceCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.invoiceHeaderRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px 38px;
+  gap: 10px;
+  align-items: center;
+}
+
+.invoiceHeaderRow input,
+.invoiceGrid input,
+.invoiceGrid select,
+.invoiceNotesField textarea,
+.installmentRow input,
+.installmentRow select {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 10px 12px;
+}
+
+.invoiceHeaderRow button,
+.installmentRow button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.invoiceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.invoiceGrid label,
+.invoiceNotesField {
+  display: grid;
+  gap: 7px;
+}
+
+.invoiceNotesField textarea {
+  min-height: 96px;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.invoiceMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.installmentsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.installmentStack {
+  display: grid;
+  gap: 8px;
+}
+
+.installmentRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 160px 38px;
+  gap: 10px;
+  align-items: center;
+}
+
+.taskWalletSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.taskWalletSummary div,
+.taskWalletRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.taskWalletRows {
+  display: grid;
+  gap: 8px;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;
@@ -1155,6 +1395,13 @@
   .createLeadInline,
   .walletRow,
   .walletTotals {
+    grid-template-columns: 1fr;
+  }
+
+  .invoiceGrid,
+  .installmentRow,
+  .invoiceHeaderRow,
+  .taskWalletSummary {
     grid-template-columns: 1fr;
   }
 

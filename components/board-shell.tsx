@@ -2,19 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Copy, GripVertical, MoreVertical, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, GripVertical, MoreVertical, Palette, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import {
+  createLeadInstallment,
+  createLeadInvoice,
   createLeadLog,
   createLead as createLeadRequest,
+  deleteLeadInstallment,
+  deleteLeadInvoice,
   deleteLeadLog,
   getLeadCompanies,
   getLeadFiles,
+  getLeadInvoices,
   getLeads,
   getLeadLogs,
   getTaskBoard,
   saveTaskBoard,
+  updateLeadInstallment,
+  updateLeadInvoice,
   updateLeadLog,
   updateLead,
+  type LeadInstallmentRecord,
+  type LeadInvoiceRecord,
   type LeadCompanyRecord,
   type LeadFileRecord,
   type LeadLogRecord,
@@ -23,6 +32,7 @@ import {
 } from "../lib/crm-api";
 import { AddressAutocomplete } from "./address-autocomplete";
 import { LeadResources } from "./lead-resources";
+import { LeadWalletPanel } from "./lead-wallet-panel";
 import { compressImageFile } from "../lib/image-compression";
 import styles from "./board-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
@@ -60,6 +70,11 @@ type Lane = {
   id: string;
   title: string;
   tasks: Task[];
+};
+
+type LaneColorSettings = {
+  color: string;
+  opacity: number;
 };
 
 type DraftTask = {
@@ -118,12 +133,50 @@ const emptyLeadEditor: UpdateLeadInput = {
 };
 
 const legacyStarterLaneIds = new Set(["lane-new", "lane-docs", "lane-review"]);
+const laneColorStorageKey = "smart-crm:lane-colors";
+const defaultLaneColor: LaneColorSettings = {
+  color: "#081526",
+  opacity: 1,
+};
+
+function getInitialLaneColors() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const stored = window.localStorage.getItem(laneColorStorageKey);
+
+    if (!stored) {
+      return {};
+    }
+
+    return JSON.parse(stored) as Record<string, LaneColorSettings>;
+  } catch (error) {
+    console.warn("[BoardShell] failed to read initial lane colors:", error);
+    return {};
+  }
+}
 
 function reorder<T>(items: T[], startIndex: number, endIndex: number) {
   const copy = [...items];
   const [removed] = copy.splice(startIndex, 1);
   copy.splice(endIndex, 0, removed);
   return copy;
+}
+
+function hexToRgba(hexColor: string, opacity: number) {
+  const normalized = hexColor.replace("#", "");
+
+  if (normalized.length !== 6) {
+    return `rgba(8, 21, 38, ${opacity})`;
+  }
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
 function getFullName(lead: LeadRecord) {
@@ -248,14 +301,18 @@ export function BoardShell() {
   const [leadEditorCompanies, setLeadEditorCompanies] = useState<LeadCompanyRecord[]>([]);
   const [leadEditorFiles, setLeadEditorFiles] = useState<Array<LeadFileRecord & { fileDataBase64?: string }>>([]);
   const [leadEditorLogs, setLeadEditorLogs] = useState<LeadLogRecord[]>([]);
+  const [leadEditorInvoices, setLeadEditorInvoices] = useState<LeadInvoiceRecord[]>([]);
   const [collapsedLogs, setCollapsedLogs] = useState<Record<string, boolean>>({});
   const [expandedLeadTaskId, setExpandedLeadTaskId] = useState<string | null>(null);
   const [leadTaskDrafts, setLeadTaskDrafts] = useState<Record<string, { notes: string; status: TaskStatus }>>({});
   const [leadLogMessage, setLeadLogMessage] = useState<string | null>(null);
+  const [leadWalletMessage, setLeadWalletMessage] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
   const [isLoadingBoard, setIsLoadingBoard] = useState(true);
   const [boardMessage, setBoardMessage] = useState<string | null>(null);
+  const [laneColors, setLaneColors] = useState<Record<string, LaneColorSettings>>(getInitialLaneColors);
+  const [activeLaneColorId, setActiveLaneColorId] = useState<string | null>(null);
   const [draggedLaneId, setDraggedLaneId] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<{
     laneId: string;
@@ -272,6 +329,7 @@ export function BoardShell() {
     walletItems: WalletDraftItem[];
   } | null>(null);
   const hasLoadedBoardRef = useRef(false);
+  const hasPersistedLaneColorsRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -306,6 +364,19 @@ export function BoardShell() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasPersistedLaneColorsRef.current) {
+      hasPersistedLaneColorsRef.current = true;
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(laneColorStorageKey, JSON.stringify(laneColors));
+    } catch (error) {
+      console.warn("[BoardShell] failed to persist lane colors:", error);
+    }
+  }, [laneColors]);
 
   useEffect(() => {
     let isMounted = true;
@@ -361,6 +432,24 @@ export function BoardShell() {
     void persistBoard(nextLanes);
   }
 
+  function updateLaneColorSettings(laneId: string, patch: Partial<LaneColorSettings>) {
+    setLaneColors((current) => ({
+      ...current,
+      [laneId]: {
+        ...(current[laneId] ?? defaultLaneColor),
+        ...patch,
+      },
+    }));
+  }
+
+  function resetLaneColorSettings(laneId: string) {
+    setLaneColors((current) => {
+      const next = { ...current };
+      delete next[laneId];
+      return next;
+    });
+  }
+
   function getLeadName(leadId?: string | null) {
     const lead = leads.find((item) => item.id === leadId);
     return lead ? getFullName(lead) : "";
@@ -399,6 +488,7 @@ export function BoardShell() {
     setCopyFeedback(null);
     setPhotoFeedback(null);
     setLeadLogMessage(null);
+    setLeadWalletMessage(null);
     setExpandedLeadTaskId(null);
     setLeadTaskDrafts({});
     setLeadEditorForm({
@@ -419,20 +509,23 @@ export function BoardShell() {
     });
 
     try {
-      const [companiesResponse, filesResponse, logsResponse] = await Promise.all([
+      const [companiesResponse, filesResponse, logsResponse, invoicesResponse] = await Promise.all([
         getLeadCompanies(lead.id),
         getLeadFiles(lead.id),
         getLeadLogs(lead.id),
+        getLeadInvoices(lead.id),
       ]);
 
       setLeadEditorCompanies(companiesResponse.companies);
       setLeadEditorFiles(filesResponse.files);
       setLeadEditorLogs(logsResponse.logs);
+      setLeadEditorInvoices(invoicesResponse.invoices);
     } catch (error) {
       console.warn("[BoardShell] failed to load lead resources:", error);
       setLeadEditorCompanies([]);
       setLeadEditorFiles([]);
       setLeadEditorLogs([]);
+      setLeadEditorInvoices([]);
     }
   }
 
@@ -640,6 +733,203 @@ export function BoardShell() {
     } catch (error) {
       console.warn("[BoardShell] failed to delete lead log:", error);
       setLeadLogMessage("We could not delete this log yet.");
+    }
+  }
+
+  async function addLeadInvoice() {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    const linkedTasks = getLeadTaskEntries(selectedLead.id)
+      .filter(({ task }) => task.status !== "done")
+      .map(({ task }) => task.id);
+    const suggestedAmount = getLeadTaskEntries(selectedLead.id)
+      .filter(({ task }) => task.status !== "done")
+      .reduce((sum, { task }) => {
+        const revenue = (task.walletItems ?? []).reduce((walletSum, item) => walletSum + parseMoney(String(item.revenue)), 0);
+        return sum + revenue;
+      }, 0);
+
+    try {
+      const response = await createLeadInvoice(selectedLead.id, {
+        title: `${getFullName(selectedLead) || "Lead"} invoice ${leadEditorInvoices.length + 1}`,
+        amount: suggestedAmount,
+        status: "pending",
+        issuedAt: new Date().toISOString().slice(0, 10),
+        dueDate: "",
+        notes: "",
+        sourceTaskIds: linkedTasks,
+      });
+      setLeadEditorInvoices((current) => [response.invoice, ...current]);
+    } catch (error) {
+      console.warn("[BoardShell] failed to create invoice:", error);
+      setLeadWalletMessage("We could not create this invoice yet.");
+    }
+  }
+
+  async function updateInvoiceDraft(invoiceId: string, patch: Partial<LeadInvoiceRecord>) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    const nextInvoices = leadEditorInvoices.map((invoice) =>
+      invoice.id === invoiceId ? { ...invoice, ...patch } : invoice
+    );
+    setLeadEditorInvoices(nextInvoices);
+
+    const nextInvoice = nextInvoices.find((invoice) => invoice.id === invoiceId);
+
+    if (!nextInvoice) {
+      return;
+    }
+
+    try {
+      const response = await updateLeadInvoice(selectedLead.id, invoiceId, {
+        title: nextInvoice.title.trim() || "Invoice",
+        amount: Number(nextInvoice.amount ?? 0),
+        status: nextInvoice.status,
+        dueDate: nextInvoice.dueDate ?? "",
+        issuedAt: nextInvoice.issuedAt ?? "",
+        notes: nextInvoice.notes ?? "",
+        sourceTaskIds: nextInvoice.sourceTaskIds ?? [],
+      });
+      setLeadEditorInvoices((current) =>
+        current.map((invoice) =>
+          invoice.id === invoiceId ? { ...response.invoice, installments: invoice.installments } : invoice
+        )
+      );
+    } catch (error) {
+      console.warn("[BoardShell] failed to update invoice:", error);
+      setLeadWalletMessage("We could not save this invoice yet.");
+    }
+  }
+
+  async function removeInvoice(invoiceId: string) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    setLeadEditorInvoices((current) => current.filter((invoice) => invoice.id !== invoiceId));
+
+    try {
+      await deleteLeadInvoice(selectedLead.id, invoiceId);
+    } catch (error) {
+      console.warn("[BoardShell] failed to delete invoice:", error);
+      setLeadWalletMessage("We could not delete this invoice yet.");
+    }
+  }
+
+  async function addInstallment(invoiceId: string) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    const invoice = leadEditorInvoices.find((item) => item.id === invoiceId);
+
+    if (!invoice) {
+      return;
+    }
+
+    try {
+      const response = await createLeadInstallment(selectedLead.id, invoiceId, {
+        amount: Number(invoice.amount ?? 0),
+        dueDate: invoice.dueDate ?? "",
+        status: "pending",
+      });
+      setLeadEditorInvoices((current) =>
+        current.map((item) =>
+          item.id === invoiceId ? { ...item, installments: [...item.installments, response.installment] } : item
+        )
+      );
+    } catch (error) {
+      console.warn("[BoardShell] failed to create installment:", error);
+      setLeadWalletMessage("We could not create this installment yet.");
+    }
+  }
+
+  async function updateInstallmentDraft(
+    invoiceId: string,
+    installmentId: string,
+    patch: Partial<LeadInstallmentRecord>
+  ) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    const nextInvoices = leadEditorInvoices.map((invoice) =>
+      invoice.id === invoiceId
+        ? {
+            ...invoice,
+            installments: invoice.installments.map((installment) =>
+              installment.id === installmentId ? { ...installment, ...patch } : installment
+            ),
+          }
+        : invoice
+    );
+    setLeadEditorInvoices(nextInvoices);
+
+    const nextInvoice = nextInvoices.find((invoice) => invoice.id === invoiceId);
+    const nextInstallment = nextInvoice?.installments.find((installment) => installment.id === installmentId);
+
+    if (!nextInstallment) {
+      return;
+    }
+
+    try {
+      const response = await updateLeadInstallment(selectedLead.id, invoiceId, installmentId, {
+        amount: Number(nextInstallment.amount ?? 0),
+        dueDate: nextInstallment.dueDate ?? "",
+        status: nextInstallment.status,
+        paidAt: nextInstallment.paidAt ?? "",
+        paymentMethod: nextInstallment.paymentMethod ?? "",
+        notes: nextInstallment.notes ?? "",
+      });
+      setLeadEditorInvoices((current) =>
+        current.map((invoice) =>
+          invoice.id === invoiceId
+            ? {
+                ...invoice,
+                installments: invoice.installments.map((installment) =>
+                  installment.id === installmentId ? response.installment : installment
+                ),
+              }
+            : invoice
+        )
+      );
+    } catch (error) {
+      console.warn("[BoardShell] failed to update installment:", error);
+      setLeadWalletMessage("We could not save this installment yet.");
+    }
+  }
+
+  async function removeInstallment(invoiceId: string, installmentId: string) {
+    if (!selectedLead) {
+      return;
+    }
+
+    setLeadWalletMessage(null);
+    setLeadEditorInvoices((current) =>
+      current.map((invoice) =>
+        invoice.id === invoiceId
+          ? {
+              ...invoice,
+              installments: invoice.installments.filter((installment) => installment.id !== installmentId),
+            }
+          : invoice
+      )
+    );
+
+    try {
+      await deleteLeadInstallment(selectedLead.id, invoiceId, installmentId);
+    } catch (error) {
+      console.warn("[BoardShell] failed to delete installment:", error);
+      setLeadWalletMessage("We could not delete this installment yet.");
     }
   }
 
@@ -1336,6 +1626,16 @@ export function BoardShell() {
             <article
               key={lane.id}
               className={styles.lane}
+              style={
+                laneColors[lane.id]
+                  ? {
+                      background: hexToRgba(
+                        laneColors[lane.id].color,
+                        laneColors[lane.id].opacity
+                      ),
+                    }
+                  : undefined
+              }
               onDragOver={(event) => {
                 if (draggedLaneId) {
                   event.preventDefault();
@@ -1387,6 +1687,14 @@ export function BoardShell() {
                   <button
                     type="button"
                     className={styles.laneIconButton}
+                    onClick={() => setActiveLaneColorId((current) => (current === lane.id ? null : lane.id))}
+                    aria-label={`Change lane color for ${lane.title}`}
+                  >
+                    <Palette size={14} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.laneIconButton}
                     onClick={() => openTaskSearch(lane.id)}
                     aria-label={`Search tasks in ${lane.title}`}
                   >
@@ -1402,6 +1710,42 @@ export function BoardShell() {
                   </button>
                 </div>
               </div>
+
+              {activeLaneColorId === lane.id ? (
+                <div className={styles.laneColorPopover}>
+                  <label className={styles.laneColorField}>
+                    <span>Color</span>
+                    <input
+                      type="color"
+                      value={laneColors[lane.id]?.color ?? defaultLaneColor.color}
+                      onChange={(event) => updateLaneColorSettings(lane.id, { color: event.target.value })}
+                    />
+                  </label>
+
+                  <label className={styles.laneColorField}>
+                    <span>Transparency</span>
+                    <input
+                      type="range"
+                      min="0.2"
+                      max="1"
+                      step="0.05"
+                      value={laneColors[lane.id]?.opacity ?? defaultLaneColor.opacity}
+                      onChange={(event) =>
+                        updateLaneColorSettings(lane.id, { opacity: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+
+                  <div className={styles.laneColorActions}>
+                    <button type="button" className={styles.secondaryAction} onClick={() => resetLaneColorSettings(lane.id)}>
+                      Reset
+                    </button>
+                    <button type="button" className={styles.secondaryAction} onClick={() => setActiveLaneColorId(null)}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               <div
                 className={styles.taskList}
@@ -1952,7 +2296,7 @@ export function BoardShell() {
                   </div>
 
                   <label className={crmStyles.field}>
-                    <span>Category</span>
+                    <span>Tag</span>
                     <select
                       value={leadEditorForm.source}
                       onChange={(event) =>
@@ -2197,6 +2541,39 @@ export function BoardShell() {
                                 />
                               </div>
                             </label>
+                            <div className={styles.taskWalletSummary}>
+                              <div>
+                                <span>Cost</span>
+                                <strong>
+                                  $
+                                  {(task.walletItems ?? [])
+                                    .reduce((sum, item) => sum + Number(item.cost ?? 0), 0)
+                                    .toFixed(2)}
+                                </strong>
+                              </div>
+                              <div>
+                                <span>Revenue</span>
+                                <strong>
+                                  $
+                                  {(task.walletItems ?? [])
+                                    .reduce((sum, item) => sum + Number(item.revenue ?? 0), 0)
+                                    .toFixed(2)}
+                                </strong>
+                              </div>
+                            </div>
+                            <div className={styles.taskWalletRows}>
+                              {(task.walletItems ?? []).map((item) => (
+                                <div key={item.id} className={styles.taskWalletRow}>
+                                  <span>{item.description || "Wallet item"}</span>
+                                  <strong>
+                                    ${Number(item.cost ?? 0).toFixed(2)} / ${Number(item.revenue ?? 0).toFixed(2)}
+                                  </strong>
+                                </div>
+                              ))}
+                              {(task.walletItems ?? []).length === 0 ? (
+                                <p className={styles.leadEmptyState}>No wallet entries for this task yet.</p>
+                              ) : null}
+                            </div>
                             <button type="button" onClick={() => saveLeadTaskUpdate(laneId, task.id)}>
                               Save task
                             </button>
@@ -2219,6 +2596,19 @@ export function BoardShell() {
                 onCompaniesChange={setLeadEditorCompanies}
                 onFilesChange={setLeadEditorFiles}
                 sections={["companies"]}
+              />
+
+              <LeadWalletPanel
+                leadName={getFullName(selectedLead)}
+                tasks={getLeadTaskEntries(selectedLead.id).map(({ task }) => task)}
+                invoices={leadEditorInvoices}
+                message={leadWalletMessage}
+                onAddInvoice={addLeadInvoice}
+                onUpdateInvoice={updateInvoiceDraft}
+                onDeleteInvoice={removeInvoice}
+                onAddInstallment={addInstallment}
+                onUpdateInstallment={updateInstallmentDraft}
+                onDeleteInstallment={removeInstallment}
               />
 
               <div className={crmStyles.modalActions}>

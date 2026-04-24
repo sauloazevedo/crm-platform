@@ -106,6 +106,45 @@ export type LeadLogRecord = LeadLogInput & {
   updatedAt?: string;
 };
 
+export type InvoiceStatus = "draft" | "pending" | "partial" | "paid" | "overdue" | "cancelled";
+export type InstallmentStatus = "pending" | "paid" | "overdue";
+
+export type LeadInstallmentInput = {
+  amount: number;
+  dueDate?: string;
+  status?: InstallmentStatus;
+  paidAt?: string;
+  paymentMethod?: string;
+  notes?: string;
+};
+
+export type LeadInstallmentRecord = LeadInstallmentInput & {
+  id: string;
+  invoiceId: string;
+  leadId: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type LeadInvoiceInput = {
+  title: string;
+  amount: number;
+  status?: InvoiceStatus;
+  dueDate?: string;
+  issuedAt?: string;
+  notes?: string;
+  sourceTaskIds?: string[];
+};
+
+export type LeadInvoiceRecord = LeadInvoiceInput & {
+  id: string;
+  leadId: string;
+  workspaceId?: string | null;
+  installments: LeadInstallmentRecord[];
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
 export type TaskBoardTask = {
   id: string;
   title: string;
@@ -473,6 +512,141 @@ export async function deleteLeadLog(leadId: string, logId: string): Promise<{ id
 
   if (!response.ok) {
     throw new Error(`Failed to delete lead log: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function getLeadInvoices(leadId: string): Promise<{ invoices: LeadInvoiceRecord[] }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/invoices`, {
+    method: "GET",
+    headers: headers ?? { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch lead invoices: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function createLeadInvoice(
+  leadId: string,
+  input: LeadInvoiceInput
+): Promise<{ invoice: LeadInvoiceRecord }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/invoices`, {
+    method: "POST",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create lead invoice: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function updateLeadInvoice(
+  leadId: string,
+  invoiceId: string,
+  input: LeadInvoiceInput
+): Promise<{ invoice: LeadInvoiceRecord }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/invoices/${invoiceId}`, {
+    method: "PATCH",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update lead invoice: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function deleteLeadInvoice(leadId: string, invoiceId: string): Promise<{ id: string }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/invoices/${invoiceId}`, {
+    method: "DELETE",
+    headers: headers ?? { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete lead invoice: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function createLeadInstallment(
+  leadId: string,
+  invoiceId: string,
+  input: LeadInstallmentInput
+): Promise<{ installment: LeadInstallmentRecord }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/invoices/${invoiceId}/installments`, {
+    method: "POST",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create installment: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function updateLeadInstallment(
+  leadId: string,
+  invoiceId: string,
+  installmentId: string,
+  input: LeadInstallmentInput
+): Promise<{ installment: LeadInstallmentRecord }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(
+    `${getApiBaseUrl()}/leads/${leadId}/invoices/${invoiceId}/installments/${installmentId}`,
+    {
+      method: "PATCH",
+      headers: headers ?? { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to update installment: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function deleteLeadInstallment(
+  leadId: string,
+  invoiceId: string,
+  installmentId: string
+): Promise<{ id: string }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(
+    `${getApiBaseUrl()}/leads/${leadId}/invoices/${invoiceId}/installments/${installmentId}`,
+    {
+      method: "DELETE",
+      headers: headers ?? { "Content-Type": "application/json" },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete installment: ${response.status}`);
   }
 
   return response.json();
