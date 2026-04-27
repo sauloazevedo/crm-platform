@@ -134,6 +134,10 @@ export function LeadResources({
   const [partnerDrafts, setPartnerDrafts] = useState<Record<string, string>>({});
   const [collapsedCompanies, setCollapsedCompanies] = useState<Record<string, boolean>>({});
 
+  function updateCompanyLocally(companyId: string, patch: Partial<LeadCompanyInput>) {
+    onCompaniesChange(companies.map((company) => (company.id === companyId ? { ...company, ...patch } : company)));
+  }
+
   async function addCompany() {
     setResourceMessage(null);
     const draft = { ...emptyCompany, companyName: "New company" };
@@ -157,9 +161,7 @@ export function LeadResources({
 
   async function updateCompany(companyId: string, patch: Partial<LeadCompanyInput>) {
     setResourceMessage(null);
-    const nextCompanies = companies.map((company) =>
-      company.id === companyId ? { ...company, ...patch } : company
-    );
+    const nextCompanies = companies.map((company) => (company.id === companyId ? { ...company, ...patch } : company));
     onCompaniesChange(nextCompanies);
 
     if (!leadId || companyId.startsWith("draft-")) {
@@ -402,7 +404,8 @@ export function LeadResources({
                           <span>EIN</span>
                           <input
                             value={company.ein ?? ""}
-                            onChange={(event) => updateCompany(company.id, { ein: event.target.value })}
+                            onChange={(event) => updateCompanyLocally(company.id, { ein: event.target.value })}
+                            onBlur={(event) => void updateCompany(company.id, { ein: event.target.value })}
                             placeholder="EIN"
                           />
                         </label>
@@ -418,7 +421,10 @@ export function LeadResources({
                           <span>Company</span>
                           <input
                             value={company.companyName}
-                            onChange={(event) => updateCompany(company.id, { companyName: event.target.value })}
+                            onChange={(event) => updateCompanyLocally(company.id, { companyName: event.target.value })}
+                            onBlur={(event) =>
+                              void updateCompany(company.id, { companyName: event.target.value.trim() || "New company" })
+                            }
                             placeholder="Company"
                           />
                         </label>
@@ -427,7 +433,10 @@ export function LeadResources({
                           <div className={styles.copyInputWrap}>
                             <AddressAutocomplete
                               value={company.principalAddress ?? ""}
-                              onChange={(principalAddress) => updateCompany(company.id, { principalAddress })}
+                              onChange={(principalAddress) => updateCompanyLocally(company.id, { principalAddress })}
+                              onBlur={() =>
+                                void updateCompany(company.id, { principalAddress: company.principalAddress ?? "" })
+                              }
                               placeholder="Principal Address"
                             />
                             <button
@@ -444,7 +453,10 @@ export function LeadResources({
                           <div className={styles.copyInputWrap}>
                             <AddressAutocomplete
                               value={company.mailingAddress ?? ""}
-                              onChange={(mailingAddress) => updateCompany(company.id, { mailingAddress })}
+                              onChange={(mailingAddress) => updateCompanyLocally(company.id, { mailingAddress })}
+                              onBlur={() =>
+                                void updateCompany(company.id, { mailingAddress: company.mailingAddress ?? "" })
+                              }
                               placeholder="Mailing Address"
                             />
                             <button
@@ -482,7 +494,12 @@ export function LeadResources({
                           <span>Other (Specify)</span>
                           <input
                             value={company.otherDescription ?? ""}
-                            onChange={(event) => updateCompany(company.id, { otherDescription: event.target.value })}
+                            onChange={(event) =>
+                              updateCompanyLocally(company.id, { otherDescription: event.target.value })
+                            }
+                            onBlur={(event) =>
+                              void updateCompany(company.id, { otherDescription: event.target.value })
+                            }
                             placeholder="Other"
                           />
                         </label>

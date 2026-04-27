@@ -335,7 +335,7 @@ export async function createLead(input: CreateLeadInput) {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create lead: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to create lead: ${response.status}`));
   }
 
   return response.json();
@@ -351,7 +351,7 @@ export async function updateLead(id: string, input: UpdateLeadInput): Promise<{ 
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update lead: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to update lead: ${response.status}`));
   }
 
   return response.json();

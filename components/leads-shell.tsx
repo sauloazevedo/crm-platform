@@ -172,6 +172,12 @@ function formatTagLabel(value?: string | null) {
   return value;
 }
 
+function getTagAccentVar(value?: string | null) {
+  const normalized = formatTagLabel(value);
+  const hash = Array.from(normalized).reduce((total, character) => total + character.charCodeAt(0), 0);
+  return `var(--tag-accent-${(hash % 5) + 1})`;
+}
+
 export function LeadsShell() {
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
@@ -451,7 +457,13 @@ export function LeadsShell() {
       closeLeadModal();
     } catch (error) {
       console.warn("[LeadsShell] failed to update lead:", error);
-      setMessage(selectedLead ? "We could not update this lead right now." : "We could not create this lead right now.");
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : selectedLead
+            ? "We could not update this lead right now."
+            : "We could not create this lead right now."
+      );
     }
   }
 
@@ -999,7 +1011,12 @@ export function LeadsShell() {
                 <span>{lead.email?.trim() || "No email yet"}</span>
               </div>
               <div className={styles.cardFooter}>
-                <span className={styles.tagPill}>{formatTagLabel(lead.source)}</span>
+                <span
+                  className={styles.tagPill}
+                  style={{ ["--tag-pill-accent" as string]: getTagAccentVar(lead.source) }}
+                >
+                  {formatTagLabel(lead.source)}
+                </span>
               </div>
             </button>
           </article>

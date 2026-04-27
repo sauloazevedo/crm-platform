@@ -237,10 +237,19 @@
   min-height: 28px;
   padding: 4px 10px;
   border-radius: 7px;
-  background: rgba(242, 131, 34, 0.12);
-  color: #ffcf98;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.activeFilterPill {
+  background: rgba(242, 131, 34, 0.12);
+  color: #ffcf98;
+}
+
+.tagPill {
+  background: color-mix(in srgb, var(--tag-pill-accent, var(--accent-cool)) 18%, transparent);
+  color: color-mix(in srgb, var(--tag-pill-accent, var(--accent-cool)) 70%, white 30%);
+  border: 1px solid color-mix(in srgb, var(--tag-pill-accent, var(--accent-cool)) 26%, transparent);
 }
 
 .cardsGrid {
@@ -285,8 +294,13 @@
 }
 
 .avatar {
+  flex: 0 0 50px;
   width: 50px;
+  min-width: 50px;
+  max-width: 50px;
   height: 50px;
+  min-height: 50px;
+  max-height: 50px;
   display: grid;
   place-items: center;
   overflow: hidden;
