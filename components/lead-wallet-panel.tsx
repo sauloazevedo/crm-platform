@@ -43,6 +43,22 @@ type Props = {
 const invoiceStatuses: InvoiceStatus[] = ["draft", "pending", "partial", "paid", "overdue", "cancelled"];
 const installmentStatuses: InstallmentStatus[] = ["pending", "paid", "overdue"];
 
+function getStatusClassName(status: string) {
+  if (status === "paid") {
+    return styles.walletStatusPaid;
+  }
+
+  if (status === "overdue") {
+    return styles.walletStatusOverdue;
+  }
+
+  if (status === "pending") {
+    return styles.walletStatusPending;
+  }
+
+  return styles.walletStatusNeutral;
+}
+
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -158,6 +174,7 @@ export function LeadWalletPanel({
                   placeholder="Invoice title"
                 />
                 <select
+                  className={getStatusClassName(invoice.status ?? "pending")}
                   value={invoice.status ?? "pending"}
                   onChange={(event) =>
                     onUpdateInvoice(invoice.id, { status: event.target.value as InvoiceStatus })
@@ -246,6 +263,7 @@ export function LeadWalletPanel({
                       }
                     />
                     <select
+                      className={getStatusClassName(installment.status ?? "pending")}
                       value={installment.status ?? "pending"}
                       onChange={(event) =>
                         onUpdateInstallment(invoice.id, installment.id, {

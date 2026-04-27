@@ -1297,6 +1297,28 @@
   padding-right: 30px;
 }
 
+.walletStatusPaid {
+  border-color: rgba(75, 242, 166, 0.45) !important;
+  background-color: rgba(75, 242, 166, 0.14) !important;
+  color: #b9ffdf !important;
+}
+
+.walletStatusOverdue {
+  border-color: rgba(242, 211, 37, 0.45) !important;
+  background-color: rgba(242, 211, 37, 0.14) !important;
+  color: #fff2a8 !important;
+}
+
+.walletStatusPending {
+  border-color: rgba(242, 83, 39, 0.45) !important;
+  background-color: rgba(242, 83, 39, 0.14) !important;
+  color: #ffc5b3 !important;
+}
+
+.walletStatusNeutral {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
 .invoiceHeaderRow button,
 .installmentRow button {
   width: 38px;
