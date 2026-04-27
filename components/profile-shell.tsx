@@ -2,9 +2,15 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { inviteWorkspaceUser, updateCurrentUserProfile } from "../lib/crm-api";
+import {
+  getWorkspaceAccessUsers,
+  inviteWorkspaceUser,
+  removeWorkspaceAccessUser,
+  updateCurrentUserProfile,
+  type WorkspaceAccessUser,
+} from "../lib/crm-api";
 import { handleConfirmResetPassword, handleResetPassword } from "../services/auth";
 import { ThemeToggle } from "./theme-toggle";
 import styles from "./profile-shell.module.css";
@@ -49,14 +55,49 @@ export function ProfileShell() {
   const [passwordNotice, setPasswordNotice] = useState<Notice | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteNotice, setInviteNotice] = useState<Notice | null>(null);
+  const [workspaceUsers, setWorkspaceUsers] = useState<WorkspaceAccessUser[]>([]);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [isInvitingUser, setIsInvitingUser] = useState(false);
+  const [isLoadingWorkspaceUsers, setIsLoadingWorkspaceUsers] = useState(true);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     setFirstName(auth.user?.firstName ?? "");
     setLastName(auth.user?.lastName ?? "");
   }, [auth.user?.firstName, auth.user?.lastName]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadWorkspaceUsers() {
+      setIsLoadingWorkspaceUsers(true);
+
+      try {
+        const response = await getWorkspaceAccessUsers();
+
+        if (isMounted) {
+          setWorkspaceUsers(response.users);
+        }
+      } catch (error) {
+        console.warn("[ProfileShell] workspace users load failed:", error);
+
+        if (isMounted) {
+          setInviteNotice({ tone: "error", message: "We could not load workspace access right now." });
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingWorkspaceUsers(false);
+        }
+      }
+    }
+
+    void loadWorkspaceUsers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [auth.user?.workspaceId]);
 
   async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -171,6 +212,8 @@ export function ProfileShell() {
     try {
       await inviteWorkspaceUser({ email });
       setInviteEmail("");
+      const response = await getWorkspaceAccessUsers();
+      setWorkspaceUsers(response.users);
       setInviteNotice({
         tone: "success",
         message: `Invitation sent to ${email}. The user will receive a temporary password by email.`,
@@ -183,6 +226,25 @@ export function ProfileShell() {
       });
     } finally {
       setIsInvitingUser(false);
+    }
+  }
+
+  async function handleRemoveWorkspaceUser(userId: string) {
+    setInviteNotice(null);
+    setRemovingUserId(userId);
+
+    try {
+      await removeWorkspaceAccessUser(userId);
+      setWorkspaceUsers((current) => current.filter((user) => user.id !== userId));
+      setInviteNotice({ tone: "success", message: "Workspace access removed successfully." });
+    } catch (error) {
+      console.warn("[ProfileShell] remove workspace user failed:", error);
+      setInviteNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "We could not remove this workspace user right now.",
+      });
+    } finally {
+      setRemovingUserId(null);
     }
   }
 
@@ -358,6 +420,55 @@ export function ProfileShell() {
               {isInvitingUser ? "Sending invite..." : "Invite user"}
             </button>
           </form>
+
+          <section className={styles.card}>
+            <div>
+              <p className={styles.cardEyebrow}>Workspace access</p>
+              <h2>Workspace members</h2>
+              <p className={styles.cardCopy}>
+                Review invited and active users in this dashboard, and remove access when needed.
+              </p>
+            </div>
+
+            <div className={styles.workspaceUserList}>
+              {isLoadingWorkspaceUsers ? <p className={styles.cardCopy}>Loading workspace users...</p> : null}
+
+              {!isLoadingWorkspaceUsers && workspaceUsers.length === 0 ? (
+                <p className={styles.cardCopy}>No invited users in this workspace yet.</p>
+              ) : null}
+
+              {workspaceUsers
+                .slice()
+                .sort((left, right) => Number(right.isCurrentUser) - Number(left.isCurrentUser))
+                .map((workspaceUser) => (
+                <article key={workspaceUser.id} className={styles.workspaceUserCard}>
+                  <div>
+                    <strong>
+                      {[workspaceUser.firstName, workspaceUser.lastName].filter(Boolean).join(" ") || workspaceUser.email}
+                    </strong>
+                    <span>{workspaceUser.email}</span>
+                  </div>
+
+                  <div className={styles.workspaceUserMeta}>
+                    <small className={styles.workspaceUserStatus}>{workspaceUser.invitationStatus}</small>
+                    <small>{workspaceUser.role}</small>
+                    {workspaceUser.isCurrentUser ? <small>You</small> : null}
+                    {!workspaceUser.isCurrentUser && workspaceUser.role !== "owner" ? (
+                      <button
+                        type="button"
+                        className={styles.removeWorkspaceUserButton}
+                        onClick={() => void handleRemoveWorkspaceUser(workspaceUser.id)}
+                        disabled={removingUserId === workspaceUser.id}
+                        aria-label={`Remove ${workspaceUser.email} from workspace`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
       </section>
     </main>

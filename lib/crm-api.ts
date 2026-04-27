@@ -191,6 +191,19 @@ export type InviteWorkspaceUserInput = {
   role?: string;
 };
 
+export type WorkspaceAccessUser = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  invitationStatus: string;
+  invitedBy?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  isCurrentUser?: boolean;
+};
+
 export async function getCurrentUserProfile(options?: {
   headers?: HeadersInit;
   signal?: AbortSignal;
@@ -254,6 +267,44 @@ export async function inviteWorkspaceUser(
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
     throw new Error(errorBody?.message || `Failed to invite workspace user: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function getWorkspaceAccessUsers(): Promise<{ users: WorkspaceAccessUser[] }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  if (!headers) {
+    throw new Error("Missing authenticated user token.");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/users/workspace-access`, {
+    method: "GET",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, `Failed to fetch workspace users: ${response.status}`));
+  }
+
+  return response.json();
+}
+
+export async function removeWorkspaceAccessUser(userId: string): Promise<{ id: string }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  if (!headers) {
+    throw new Error("Missing authenticated user token.");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/users/workspace-access/${userId}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, `Failed to remove workspace user: ${response.status}`));
   }
 
   return response.json();

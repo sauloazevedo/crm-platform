@@ -132,6 +132,92 @@
   background: var(--surface-strong);
 }
 
+.workspaceUserList {
+  display: grid;
+  gap: 12px;
+}
+
+.workspaceUserCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.workspaceUserCard strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.workspaceUserCard span {
+  color: var(--muted);
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+
+.workspaceUserMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workspaceUserMeta small,
+.workspaceUserStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--muted);
+}
+
+.workspaceUserStatus {
+  border-color: rgba(75, 242, 226, 0.22);
+  background: rgba(75, 242, 226, 0.1);
+  color: var(--accent-cool);
+}
+
+.removeWorkspaceUserButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(242, 93, 39, 0.24);
+  border-radius: 7px;
+  background: rgba(242, 93, 39, 0.08);
+  color: var(--accent-strong);
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.removeWorkspaceUserButton:hover:not(:disabled) {
+  border-color: rgba(242, 93, 39, 0.4);
+  background: rgba(242, 93, 39, 0.14);
+  transform: translateY(-1px);
+}
+
+.removeWorkspaceUserButton:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
 .field {
   display: grid;
   gap: 8px;
@@ -243,5 +329,13 @@
 
   .grid {
     display: grid;
+  }
+
+  .workspaceUserCard {
+    display: grid;
+  }
+
+  .workspaceUserMeta {
+    justify-content: flex-start;
   }
 }

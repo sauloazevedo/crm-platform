@@ -22,6 +22,7 @@ export type SessionUser = {
   firstName?: string;
   lastName?: string;
   role?: string;
+  workspaceId?: string | null;
   sessionToken?: string;
   idToken?: string;
   accessToken?: string;
@@ -231,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           firstName: userProfile?.user.firstName ?? mappedUser.firstName,
           lastName: userProfile?.user.lastName ?? mappedUser.lastName,
           role: userProfile?.user.role ?? mappedUser.role,
+          workspaceId: userProfile?.user.workspaceId ?? null,
         });
       }
     } catch (error) {
