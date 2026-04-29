@@ -19,15 +19,18 @@ export type CreateLeadInput = {
   firstName: string;
   middleName?: string;
   lastName: string;
+  createdAt?: string;
   leadPhotoDataUrl?: string;
   dateOfBirth?: string;
   taxId?: string;
   taxIdLast4?: string;
   gender?: string;
-  phoneNumber: string;
+  phoneNumber?: string;
   email?: string;
   address?: string;
   source?: string;
+  leadSourceId?: string;
+  leadSourceName?: string;
   serviceInterest?: string;
   preferredLanguage?: string;
   taxYear?: number;
@@ -50,6 +53,8 @@ export type LeadRecord = {
   email?: string | null;
   address?: string | null;
   source?: string | null;
+  leadSourceId?: string | null;
+  leadSourceName?: string | null;
   serviceInterest?: string | null;
   preferredLanguage?: string | null;
   taxYear?: number | null;
@@ -153,6 +158,7 @@ export type LeadInvoiceRecord = LeadInvoiceInput & {
 export type TaskBoardTask = {
   id: string;
   title: string;
+  createdAt?: string | null;
   notes: string;
   leadId?: string | null;
   leadName?: string | null;

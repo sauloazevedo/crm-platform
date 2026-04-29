@@ -62,6 +62,7 @@ const emptyEditor: UpdateLeadInput = {
   firstName: "",
   middleName: "",
   lastName: "",
+  createdAt: "",
   leadPhotoDataUrl: "",
   dateOfBirth: "",
   taxId: "",
@@ -69,6 +70,8 @@ const emptyEditor: UpdateLeadInput = {
   phoneNumber: "",
   email: "",
   address: "",
+  leadSourceId: "",
+  leadSourceName: "",
   source: "lead",
   serviceInterest: "Tax preparation",
   preferredLanguage: "English",
@@ -107,6 +110,10 @@ function formatPhoneNumber(value?: string | null) {
   }
 
   return value ?? "";
+}
+
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function parseMoney(value: unknown) {
@@ -291,6 +298,19 @@ export function LeadsShell() {
     });
   }, [leads, nameSearch, phoneSearch, tagFilter]);
 
+  const leadSourceResults = useMemo(() => {
+    const query = normalize(editorForm.leadSourceName ?? "");
+
+    if (query.length < 3) {
+      return [];
+    }
+
+    return leads
+      .filter((lead) => lead.id !== selectedLead?.id)
+      .filter((lead) => normalize(fullName(lead)).includes(query))
+      .slice(0, 6);
+  }, [editorForm.leadSourceName, leads, selectedLead?.id]);
+
   async function openLeadEditor(lead: LeadRecord) {
     setSelectedLead(lead);
     setIsLeadModalOpen(true);
@@ -304,6 +324,7 @@ export function LeadsShell() {
       firstName: lead.firstName ?? "",
       middleName: lead.middleName ?? "",
       lastName: lead.lastName ?? "",
+      createdAt: lead.createdAt ? String(lead.createdAt).slice(0, 10) : "",
       leadPhotoDataUrl: lead.leadPhotoDataUrl ?? "",
       dateOfBirth: lead.dateOfBirth ? String(lead.dateOfBirth).slice(0, 10) : "",
       taxId: lead.taxId ?? "",
@@ -311,6 +332,8 @@ export function LeadsShell() {
       phoneNumber: formatPhoneNumber(lead.phoneNumber),
       email: lead.email ?? "",
       address: lead.address ?? "",
+      leadSourceId: lead.leadSourceId ?? "",
+      leadSourceName: lead.leadSourceName ?? "",
       source: leadCategoryOptions.includes(lead.source ?? "") ? lead.source ?? "lead" : "lead",
       serviceInterest: lead.serviceInterest ?? "Tax preparation",
       preferredLanguage: lead.preferredLanguage ?? "English",
@@ -347,7 +370,7 @@ export function LeadsShell() {
     setLeadWalletMessage(null);
     setExpandedLeadTaskId(null);
     setLeadTaskDrafts({});
-    setEditorForm(emptyEditor);
+    setEditorForm({ ...emptyEditor, createdAt: getTodayDate() });
     setEditorCompanies([]);
     setEditorFiles([]);
     setEditorLogs([]);
@@ -441,9 +464,12 @@ export function LeadsShell() {
         firstName: editorForm.firstName.trim(),
         middleName: editorForm.middleName?.trim(),
         lastName: editorForm.lastName.trim(),
-        phoneNumber: editorForm.phoneNumber.trim(),
+        createdAt: editorForm.createdAt?.trim() || undefined,
+        phoneNumber: editorForm.phoneNumber?.trim() ?? "",
         email: editorForm.email?.trim(),
         address: editorForm.address?.trim(),
+        leadSourceId: editorForm.leadSourceId?.trim() || undefined,
+        leadSourceName: editorForm.leadSourceName?.trim() || undefined,
       };
 
       if (selectedLead) {
@@ -477,6 +503,22 @@ export function LeadsShell() {
           task,
         }))
     );
+  }
+
+  function selectLeadSource(lead: LeadRecord) {
+    setEditorForm((current) => ({
+      ...current,
+      leadSourceId: lead.id,
+      leadSourceName: fullName(lead),
+    }));
+  }
+
+  function removeLeadSource() {
+    setEditorForm((current) => ({
+      ...current,
+      leadSourceId: "",
+      leadSourceName: "",
+    }));
   }
 
   function toggleLeadTaskEditor(task: TaskBoardLane["tasks"][number]) {
@@ -1111,6 +1153,15 @@ export function LeadsShell() {
                   </label>
 
                   <label className={crmStyles.field}>
+                    <span>Created date</span>
+                    <input
+                      type="date"
+                      value={editorForm.createdAt ?? ""}
+                      onChange={(event) => setEditorForm((current) => ({ ...current, createdAt: event.target.value }))}
+                    />
+                  </label>
+
+                  <label className={crmStyles.field}>
                     <span>Date of birth</span>
                     <input
                       type="date"
@@ -1178,7 +1229,7 @@ export function LeadsShell() {
                         onBlur={() =>
                           setEditorForm((current) => ({
                             ...current,
-                            phoneNumber: formatPhoneNumber(current.phoneNumber.trim()),
+                            phoneNumber: formatPhoneNumber((current.phoneNumber ?? "").trim()),
                           }))
                         }
                         onChange={(event) =>
@@ -1235,6 +1286,47 @@ export function LeadsShell() {
                       >
                         <Copy size={17} />
                       </button>
+                    </div>
+                  </label>
+
+                  <label className={crmStyles.fieldFull}>
+                    <span>Lead Source</span>
+                    <div className={boardStyles.leadSearchBox}>
+                      {editorForm.leadSourceId ? (
+                        <div className={boardStyles.selectedLeadBox}>
+                          <div>
+                            <strong>{editorForm.leadSourceName}</strong>
+                            <span>Referring lead from your base</span>
+                          </div>
+                          <button type="button" onClick={removeLeadSource} aria-label="Remove selected lead source">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            value={editorForm.leadSourceName ?? ""}
+                            onChange={(event) =>
+                              setEditorForm((current) => ({
+                                ...current,
+                                leadSourceId: "",
+                                leadSourceName: event.target.value,
+                              }))
+                            }
+                            placeholder="Search lead who referred this client"
+                          />
+                          {leadSourceResults.length > 0 ? (
+                            <div className={boardStyles.leadSearchResults}>
+                              {leadSourceResults.map((lead) => (
+                                <button key={lead.id} type="button" onClick={() => selectLeadSource(lead)}>
+                                  <strong>{fullName(lead)}</strong>
+                                  <span>{formatPhoneNumber(lead.phoneNumber) || "Lead record"}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   </label>
                 </div>

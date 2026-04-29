@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Copy, GripVertical, MoreVertical, Palette, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import {
@@ -57,6 +57,7 @@ type WalletDraftItem = {
 type Task = {
   id: string;
   title: string;
+  createdAt?: string | null;
   notes: string;
   leadId?: string | null;
   leadName?: string | null;
@@ -80,6 +81,7 @@ type LaneColorSettings = {
 type DraftTask = {
   title: string;
   titleWasSelected: boolean;
+  createdAt: string;
   notes: string;
   leadId: string;
   leadSearch: string;
@@ -105,6 +107,7 @@ const leadCategoryOptions = ["client", "recovery", "lead", "Proposal rejected", 
 const emptyTaskDraft: DraftTask = {
   title: "",
   titleWasSelected: false,
+  createdAt: getTodayDate(),
   notes: "",
   leadId: "",
   leadSearch: "",
@@ -119,6 +122,7 @@ const emptyLeadEditor: UpdateLeadInput = {
   firstName: "",
   middleName: "",
   lastName: "",
+  createdAt: "",
   leadPhotoDataUrl: "",
   dateOfBirth: "",
   taxId: "",
@@ -126,6 +130,8 @@ const emptyLeadEditor: UpdateLeadInput = {
   phoneNumber: "",
   email: "",
   address: "",
+  leadSourceId: "",
+  leadSourceName: "",
   source: "lead",
   serviceInterest: "Tax preparation",
   preferredLanguage: "English",
@@ -206,6 +212,10 @@ function formatPhoneNumber(value?: string | null) {
   return value ?? "";
 }
 
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function parseMoney(value: string) {
   const parsed = Number(value.replace(/[^0-9.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
@@ -279,6 +289,7 @@ function normalizeBoard(lanes: Lane[]): Lane[] {
       ...lane,
       tasks: lane.tasks.map((task) => ({
         ...task,
+        createdAt: task.createdAt ?? getTodayDate(),
         status: task.status === "done" ? "done" : "in_progress",
         hidden: task.hidden === true,
         walletItems: task.walletItems ?? [],
@@ -324,6 +335,7 @@ export function BoardShell() {
     laneId: string;
     taskId: string;
     title: string;
+    createdAt: string;
     notes: string;
     leadId?: string | null;
     leadSearch: string;
@@ -332,6 +344,19 @@ export function BoardShell() {
   } | null>(null);
   const hasLoadedBoardRef = useRef(false);
   const hasPersistedLaneColorsRef = useRef(false);
+
+  const leadSourceResults = useMemo(() => {
+    const query = (leadEditorForm.leadSourceName ?? "").trim().toLowerCase();
+
+    if (query.length < 3) {
+      return [];
+    }
+
+    return leads
+      .filter((lead) => lead.id !== selectedLead?.id)
+      .filter((lead) => getFullName(lead).trim().toLowerCase().includes(query))
+      .slice(0, 6);
+  }, [leadEditorForm.leadSourceName, leads, selectedLead?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -497,6 +522,7 @@ export function BoardShell() {
       firstName: lead.firstName ?? "",
       middleName: lead.middleName ?? "",
       lastName: lead.lastName ?? "",
+      createdAt: lead.createdAt ? String(lead.createdAt).slice(0, 10) : "",
       leadPhotoDataUrl: lead.leadPhotoDataUrl ?? "",
       dateOfBirth: lead.dateOfBirth ? String(lead.dateOfBirth).slice(0, 10) : "",
       taxId: lead.taxId ?? "",
@@ -504,6 +530,8 @@ export function BoardShell() {
       phoneNumber: formatPhoneNumber(lead.phoneNumber),
       email: lead.email ?? "",
       address: lead.address ?? "",
+      leadSourceId: lead.leadSourceId ?? "",
+      leadSourceName: lead.leadSourceName ?? "",
       source: leadCategoryOptions.includes(lead.source ?? "") ? lead.source ?? "lead" : "lead",
       serviceInterest: lead.serviceInterest ?? "Tax preparation",
       preferredLanguage: lead.preferredLanguage ?? "English",
@@ -590,9 +618,12 @@ export function BoardShell() {
         firstName: leadEditorForm.firstName.trim(),
         middleName: leadEditorForm.middleName?.trim(),
         lastName: leadEditorForm.lastName.trim(),
-        phoneNumber: leadEditorForm.phoneNumber.trim(),
+        createdAt: leadEditorForm.createdAt?.trim() || undefined,
+        phoneNumber: leadEditorForm.phoneNumber?.trim() ?? "",
         email: leadEditorForm.email?.trim(),
         address: leadEditorForm.address?.trim(),
+        leadSourceId: leadEditorForm.leadSourceId?.trim() || undefined,
+        leadSourceName: leadEditorForm.leadSourceName?.trim() || undefined,
       });
       const updatedLeadName = getFullName(response.lead);
       const nextLanes = lanes.map((lane) => ({
@@ -611,6 +642,22 @@ export function BoardShell() {
       console.warn("[BoardShell] failed to update lead:", error);
       setBoardMessage("We could not update this lead right now.");
     }
+  }
+
+  function selectLeadSource(lead: LeadRecord) {
+    setLeadEditorForm((current) => ({
+      ...current,
+      leadSourceId: lead.id,
+      leadSourceName: getFullName(lead),
+    }));
+  }
+
+  function removeLeadSource() {
+    setLeadEditorForm((current) => ({
+      ...current,
+      leadSourceId: "",
+      leadSourceName: "",
+    }));
   }
 
   function getLeadTaskEntries(leadId: string) {
@@ -1207,7 +1254,7 @@ export function BoardShell() {
     const { firstName, lastName } = splitLeadName(draft.newLeadName);
     const phoneNumber = draft.newLeadPhone.trim();
 
-    if (!firstName || !phoneNumber) {
+    if (!firstName) {
       return;
     }
 
@@ -1224,6 +1271,7 @@ export function BoardShell() {
         firstName,
         lastName,
         phoneNumber,
+        createdAt: getTodayDate(),
       });
       const lead = response.lead as LeadRecord;
       const leadName = getFullName(lead);
@@ -1375,6 +1423,7 @@ export function BoardShell() {
               {
                 id: `task-${crypto.randomUUID()}`,
                 title,
+                createdAt: draft.createdAt || getTodayDate(),
                 notes,
                 leadId: draft.leadId || null,
                 leadSearch: leadName || "",
@@ -1404,6 +1453,7 @@ export function BoardShell() {
       laneId,
       taskId,
       title: task.title,
+      createdAt: task.createdAt ? String(task.createdAt).slice(0, 10) : getTodayDate(),
       notes: task.notes,
       leadId: task.leadId,
       leadSearch: getTaskLeadName(task),
@@ -1424,6 +1474,7 @@ export function BoardShell() {
                 ? {
                     ...taskItem,
                     title: editingTask.title.trim(),
+                    createdAt: editingTask.createdAt || getTodayDate(),
                     notes: editingTask.notes.trim(),
                     leadId: editingTask.leadId || null,
                     leadName: editingTask.leadId ? getLeadName(editingTask.leadId) || editingTask.leadSearch : null,
@@ -1998,7 +2049,7 @@ export function BoardShell() {
                 <div className={styles.createLeadInline}>
                   <div>
                     <strong>Create a new lead</strong>
-                    <span>Use only name and phone, then attach automatically.</span>
+                    <span>Name is enough. Phone is optional, then attach automatically.</span>
                   </div>
                   <input
                     value={laneDrafts[activeTaskModalLaneId]?.newLeadName ?? ""}
@@ -2008,7 +2059,7 @@ export function BoardShell() {
                   <input
                     value={laneDrafts[activeTaskModalLaneId]?.newLeadPhone ?? ""}
                     onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "newLeadPhone", event.target.value)}
-                    placeholder="Phone number"
+                    placeholder="Phone number (optional)"
                   />
                   <button
                     type="button"
@@ -2078,6 +2129,15 @@ export function BoardShell() {
             </label>
 
             <label>
+              <span>Created date</span>
+              <input
+                type="date"
+                value={laneDrafts[activeTaskModalLaneId]?.createdAt ?? getTodayDate()}
+                onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "createdAt", event.target.value)}
+              />
+            </label>
+
+            <label>
               <span>Status</span>
               <select
                 value={laneDrafts[activeTaskModalLaneId]?.status ?? "in_progress"}
@@ -2138,6 +2198,17 @@ export function BoardShell() {
                   setEditingTask((current) => (current ? { ...current, title: event.target.value } : current))
                 }
                 placeholder="Task title"
+              />
+            </label>
+
+            <label>
+              <span>Created date</span>
+              <input
+                type="date"
+                value={editingTask.createdAt}
+                onChange={(event) =>
+                  setEditingTask((current) => (current ? { ...current, createdAt: event.target.value } : current))
+                }
               />
             </label>
 
@@ -2343,6 +2414,17 @@ export function BoardShell() {
                   </label>
 
                   <label className={crmStyles.field}>
+                    <span>Created date</span>
+                    <input
+                      type="date"
+                      value={leadEditorForm.createdAt ?? ""}
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({ ...current, createdAt: event.target.value }))
+                      }
+                    />
+                  </label>
+
+                  <label className={crmStyles.field}>
                     <span>Date of birth</span>
                     <input
                       type="date"
@@ -2416,7 +2498,7 @@ export function BoardShell() {
                         onBlur={() =>
                           setLeadEditorForm((current) => ({
                             ...current,
-                            phoneNumber: formatPhoneNumber(current.phoneNumber.trim()),
+                            phoneNumber: formatPhoneNumber((current.phoneNumber ?? "").trim()),
                           }))
                         }
                         onChange={(event) =>
@@ -2479,6 +2561,47 @@ export function BoardShell() {
                       >
                         <Copy size={17} />
                       </button>
+                    </div>
+                  </label>
+
+                  <label className={crmStyles.fieldFull}>
+                    <span>Lead Source</span>
+                    <div className={styles.leadSearchBox}>
+                      {leadEditorForm.leadSourceId ? (
+                        <div className={styles.selectedLeadBox}>
+                          <div>
+                            <strong>{leadEditorForm.leadSourceName}</strong>
+                            <span>Referring lead from your base</span>
+                          </div>
+                          <button type="button" onClick={removeLeadSource} aria-label="Remove selected lead source">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            value={leadEditorForm.leadSourceName ?? ""}
+                            onChange={(event) =>
+                              setLeadEditorForm((current) => ({
+                                ...current,
+                                leadSourceId: "",
+                                leadSourceName: event.target.value,
+                              }))
+                            }
+                            placeholder="Search lead who referred this client"
+                          />
+                          {leadSourceResults.length > 0 ? (
+                            <div className={styles.leadSearchResults}>
+                              {leadSourceResults.map((lead) => (
+                                <button key={lead.id} type="button" onClick={() => selectLeadSource(lead)}>
+                                  <strong>{getFullName(lead)}</strong>
+                                  <span>{formatPhoneNumber(lead.phoneNumber) || "Lead record"}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   </label>
                 </div>

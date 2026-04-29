@@ -70,6 +70,7 @@ const emptyForm = {
   firstName: "",
   middleName: "",
   lastName: "",
+  createdAt: "",
   leadPhotoDataUrl: "",
   dateOfBirth: "",
   taxId: "",
@@ -95,6 +96,10 @@ function formatPhoneNumber(value: string) {
   }
 
   return value;
+}
+
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function CrmShell() {
@@ -217,12 +222,13 @@ export function CrmShell() {
   }
 
   function openLeadModal() {
+    setLeadForm((current) => ({ ...current, createdAt: current.createdAt || getTodayDate() }));
     setIsLeadModalOpen(true);
   }
 
   function closeLeadModal() {
     setIsLeadModalOpen(false);
-    setLeadForm(emptyForm);
+    setLeadForm({ ...emptyForm, createdAt: getTodayDate() });
     setLeadCompanies([]);
     setLeadFiles([]);
   }
@@ -230,7 +236,7 @@ export function CrmShell() {
   async function createLead(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!leadForm.firstName.trim() || !leadForm.lastName.trim() || !leadForm.phoneNumber.trim()) {
+    if (!leadForm.firstName.trim() || !leadForm.lastName.trim()) {
       return;
     }
 
@@ -239,6 +245,7 @@ export function CrmShell() {
         firstName: leadForm.firstName.trim(),
         middleName: leadForm.middleName.trim(),
         lastName: leadForm.lastName.trim(),
+        createdAt: leadForm.createdAt.trim() || undefined,
         leadPhotoDataUrl: leadForm.leadPhotoDataUrl,
         dateOfBirth: leadForm.dateOfBirth.trim(),
         taxId: leadForm.taxId.trim(),
@@ -523,6 +530,17 @@ export function CrmShell() {
                         setLeadForm((current) => ({ ...current, lastName: event.target.value }))
                       }
                       placeholder="Last name"
+                    />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span>Created date</span>
+                    <input
+                      type="date"
+                      value={leadForm.createdAt}
+                      onChange={(event) =>
+                        setLeadForm((current) => ({ ...current, createdAt: event.target.value }))
+                      }
                     />
                   </label>
 
