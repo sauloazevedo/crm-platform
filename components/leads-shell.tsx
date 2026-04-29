@@ -18,6 +18,7 @@ import {
   getLeadLogs,
   getLeads,
   getTaskBoard,
+  importLeadsCsv,
   saveTaskBoard,
   updateLeadInstallment,
   updateLeadInvoice,
@@ -211,34 +212,36 @@ export function LeadsShell() {
   const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
   const [leadLogMessage, setLeadLogMessage] = useState<string | null>(null);
   const [leadWalletMessage, setLeadWalletMessage] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importYear, setImportYear] = useState(new Date().getFullYear());
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImportingCsv, setIsImportingCsv] = useState(false);
+
+  async function loadLeads() {
+    setIsLoading(true);
+    setMessage(null);
+
+    try {
+      const response = await getLeads();
+      setLeads(response.leads);
+    } catch (error) {
+      console.warn("[LeadsShell] failed to load leads:", error);
+      setMessage("We could not load leads right now.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadLeads() {
-      setIsLoading(true);
-      setMessage(null);
-
-      try {
-        const response = await getLeads();
-
-        if (isMounted) {
-          setLeads(response.leads);
-        }
-      } catch (error) {
-        console.warn("[LeadsShell] failed to load leads:", error);
-
-        if (isMounted) {
-          setMessage("We could not load leads right now.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+    void (async () => {
+      if (!isMounted) {
+        return;
       }
-    }
 
-    void loadLeads();
+      await loadLeads();
+    })();
 
     return () => {
       isMounted = false;
@@ -375,6 +378,39 @@ export function LeadsShell() {
     setEditorFiles([]);
     setEditorLogs([]);
     setEditorInvoices([]);
+  }
+
+  async function handleImportCsv() {
+    if (!importFile) {
+      setMessage("Choose a CSV file to import.");
+      return;
+    }
+
+    setIsImportingCsv(true);
+    setMessage(null);
+
+    try {
+      const bytes = new Uint8Array(await importFile.arrayBuffer());
+      let binary = "";
+
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+
+      const csvBase64 = btoa(binary);
+      const response = await importLeadsCsv({ csvBase64, importYear });
+      await loadLeads();
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      setMessage(
+        `${response.createdLeads} leads created, ${response.createdTasks} tasks created, ${response.updatedTasks} tasks updated.`
+      );
+    } catch (error) {
+      console.warn("[LeadsShell] failed to import CSV:", error);
+      setMessage(error instanceof Error ? error.message : "We could not import this CSV right now.");
+    } finally {
+      setIsImportingCsv(false);
+    }
   }
 
   function closeLeadModal() {
@@ -931,6 +967,9 @@ export function LeadsShell() {
           <button type="button" className={styles.filterToggle} onClick={() => setIsFilterOpen((current) => !current)}>
             <Filter size={16} strokeWidth={2} aria-hidden="true" />
             Filters
+          </button>
+          <button type="button" className={styles.filterToggle} onClick={() => setIsImportModalOpen(true)}>
+            Import CSV
           </button>
           <Link href="/dashboard">Back to dashboard</Link>
           <button type="button" className={styles.primaryLinkButton} onClick={openNewLeadModal}>
@@ -1586,6 +1625,58 @@ export function LeadsShell() {
                 </button>
               </div>
             </form>
+          </aside>
+        </div>
+      ) : null}
+
+      {isImportModalOpen ? (
+        <div className={crmStyles.modalOverlay} onClick={() => setIsImportModalOpen(false)}>
+          <aside className={styles.importModal} onClick={(event) => event.stopPropagation()}>
+            <div className={styles.importModalHeader}>
+              <div>
+                <p className={styles.eyebrow}>Batch import</p>
+                <h2>Import leads and tasks</h2>
+                <p>Upload your CSV and choose the year that should be used as the created date for these old records.</p>
+              </div>
+              <button type="button" className={styles.filterToggle} onClick={() => setIsImportModalOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            <div className={styles.importForm}>
+              <label>
+                <span>CSV file</span>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+
+              <label>
+                <span>Created year</span>
+                <input
+                  type="number"
+                  min={2000}
+                  max={2100}
+                  value={importYear}
+                  onChange={(event) => setImportYear(Number(event.target.value || new Date().getFullYear()))}
+                />
+              </label>
+
+              <p className={styles.importHint}>
+                We will use January 1 of the selected year as the created date for imported leads and tasks.
+              </p>
+
+              <div className={styles.importActions}>
+                <button type="button" className={styles.filterToggle} onClick={() => setIsImportModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="button" className={styles.primaryLinkButton} onClick={handleImportCsv} disabled={isImportingCsv}>
+                  {isImportingCsv ? "Importing..." : "Import CSV"}
+                </button>
+              </div>
+            </div>
           </aside>
         </div>
       ) : null}

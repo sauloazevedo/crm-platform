@@ -404,6 +404,72 @@
   width: min(100%, 520px);
 }
 
+.importModal {
+  width: min(100%, 620px);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.importModalHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.importModalHeader h2 {
+  margin: 0;
+}
+
+.importModalHeader p:not(.eyebrow) {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.importForm {
+  display: grid;
+  gap: 16px;
+}
+
+.importForm label {
+  display: grid;
+  gap: 8px;
+}
+
+.importForm span {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.importForm input {
+  min-height: 48px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.importHint {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.importActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .confirmModal h2,
 .modalHeader h2 {
   margin: 0;

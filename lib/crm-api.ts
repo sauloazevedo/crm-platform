@@ -347,6 +347,31 @@ export async function createLead(input: CreateLeadInput) {
   return response.json();
 }
 
+export async function importLeadsCsv(input: {
+  csvBase64: string;
+  importYear: number;
+}): Promise<{
+  message: string;
+  processedRows: number;
+  createdLeads: number;
+  createdTasks: number;
+  updatedTasks: number;
+}> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/import`, {
+    method: "POST",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, `Failed to import leads CSV: ${response.status}`));
+  }
+
+  return response.json();
+}
+
 export async function updateLead(id: string, input: UpdateLeadInput): Promise<{ lead: LeadRecord }> {
   const headers = await getAuthHeaders({ includeJsonContentType: true });
 
