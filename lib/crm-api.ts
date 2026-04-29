@@ -210,6 +210,26 @@ export type WorkspaceAccessUser = {
   isCurrentUser?: boolean;
 };
 
+function normalizeTimestampInput(value: string | null | undefined) {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const directDate = value.trim().slice(0, 10);
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(directDate)) {
+    return directDate;
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toISOString().slice(0, 10);
+}
+
 export async function getCurrentUserProfile(options?: {
   headers?: HeadersInit;
   signal?: AbortSignal;
@@ -784,15 +804,22 @@ export async function getTaskBoard(): Promise<{ lanes: TaskBoardLane[] }> {
 
 export async function saveTaskBoard(lanes: TaskBoardLane[]): Promise<{ lanes: TaskBoardLane[] }> {
   const headers = await getAuthHeaders({ includeJsonContentType: true });
+  const normalizedLanes = lanes.map((lane) => ({
+    ...lane,
+    tasks: lane.tasks.map((task) => ({
+      ...task,
+      createdAt: normalizeTimestampInput(task.createdAt),
+    })),
+  }));
 
   const response = await fetch(`${getApiBaseUrl()}/task-board`, {
     method: "PUT",
     headers: headers ?? { "Content-Type": "application/json" },
-    body: JSON.stringify({ lanes }),
+    body: JSON.stringify({ lanes: normalizedLanes }),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to save task board: ${response.status}`);
+    throw new Error(await readApiError(response, `Failed to save task board: ${response.status}`));
   }
 
   return response.json();

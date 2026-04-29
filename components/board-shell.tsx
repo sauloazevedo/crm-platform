@@ -297,6 +297,10 @@ function normalizeBoard(lanes: Lane[]): Lane[] {
     }));
 }
 
+function isDoneLaneTitle(title: string) {
+  return title.trim().toLowerCase() === "done";
+}
+
 export function BoardShell() {
   const [lanes, setLanes] = useState<Lane[]>([]);
   const [leads, setLeads] = useState<LeadRecord[]>([]);
@@ -342,8 +346,9 @@ export function BoardShell() {
     status: TaskStatus;
     walletItems: WalletDraftItem[];
   } | null>(null);
-  const hasLoadedBoardRef = useRef(false);
   const hasPersistedLaneColorsRef = useRef(false);
+  const isPersistingBoardRef = useRef(false);
+  const queuedBoardRef = useRef<Lane[] | null>(null);
 
   const leadSourceResults = useMemo(() => {
     const query = (leadEditorForm.leadSourceName ?? "").trim().toLowerCase();
@@ -371,7 +376,6 @@ export function BoardShell() {
 
         setLanes(normalizeBoard(response.lanes as Lane[]));
         setBoardMessage(null);
-        hasLoadedBoardRef.current = true;
       } catch (error) {
         console.warn("[BoardShell] failed to load task board:", error);
 
@@ -427,30 +431,32 @@ export function BoardShell() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!hasLoadedBoardRef.current || isLoadingBoard) {
+  async function persistBoard(nextLanes: Lane[]) {
+    if (isPersistingBoardRef.current) {
+      queuedBoardRef.current = nextLanes;
       return;
     }
 
-    const timeoutId = window.setTimeout(async () => {
-      try {
-        await saveTaskBoard(lanes);
-      } catch (error) {
-        console.warn("[BoardShell] failed to save task board:", error);
-        setBoardMessage("We could not save the task board changes yet.");
-      }
-    }, 500);
+    isPersistingBoardRef.current = true;
+    let pendingLanes: Lane[] | null = nextLanes;
 
-    return () => window.clearTimeout(timeoutId);
-  }, [isLoadingBoard, lanes]);
-
-  async function persistBoard(nextLanes: Lane[]) {
     try {
-      await saveTaskBoard(nextLanes);
-      setBoardMessage(null);
+      while (pendingLanes) {
+        await saveTaskBoard(pendingLanes);
+        setBoardMessage(null);
+
+        if (queuedBoardRef.current) {
+          pendingLanes = queuedBoardRef.current;
+          queuedBoardRef.current = null;
+        } else {
+          pendingLanes = null;
+        }
+      }
     } catch (error) {
       console.warn("[BoardShell] failed to save task board:", error);
-      setBoardMessage("We could not save the task board changes yet.");
+      setBoardMessage(error instanceof Error ? error.message : "We could not save the task board changes yet.");
+    } finally {
+      isPersistingBoardRef.current = false;
     }
   }
 
@@ -1147,6 +1153,14 @@ export function BoardShell() {
     setLanes((current) => current.map((lane) => (lane.id === laneId ? { ...lane, title } : lane)));
   }
 
+  function commitLaneTitle(laneId: string, title: string) {
+    const nextLanes = lanes.map((lane) =>
+      lane.id === laneId ? { ...lane, title: title.trim() || "Untitled lane" } : lane
+    );
+
+    setLanesAndPersist(nextLanes);
+  }
+
   function deleteLane(laneId: string) {
     const nextLanes = lanes.filter((lane) => lane.id !== laneId);
 
@@ -1500,11 +1514,71 @@ export function BoardShell() {
   }
 
   function changeTaskStatus(laneId: string, taskId: string, status: TaskStatus) {
+    const sourceLane = lanes.find((lane) => lane.id === laneId);
+    const sourceTask = sourceLane?.tasks.find((task) => task.id === taskId);
+
+    if (!sourceLane || !sourceTask) {
+      return;
+    }
+
+    const doneLane = lanes.find((lane) => isDoneLaneTitle(lane.title));
+    const reopenedLane =
+      lanes.find((lane) => lane.id !== laneId && !isDoneLaneTitle(lane.title)) ??
+      lanes.find((lane) => !isDoneLaneTitle(lane.title));
+
+    if (status === "done" && doneLane && doneLane.id !== laneId) {
+      const nextLanes = lanes.map((lane) => {
+        if (lane.id === laneId) {
+          return {
+            ...lane,
+            tasks: lane.tasks.filter((task) => task.id !== taskId),
+          };
+        }
+
+        if (lane.id === doneLane.id) {
+          return {
+            ...lane,
+            tasks: [...lane.tasks, { ...sourceTask, status: "done" as TaskStatus, hidden: false }],
+          };
+        }
+
+        return lane;
+      });
+
+      setLanesAndPersist(nextLanes);
+      return;
+    }
+
+    if (status === "in_progress" && isDoneLaneTitle(sourceLane.title) && reopenedLane && reopenedLane.id !== laneId) {
+      const nextLanes = lanes.map((lane) => {
+        if (lane.id === laneId) {
+          return {
+            ...lane,
+            tasks: lane.tasks.filter((task) => task.id !== taskId),
+          };
+        }
+
+        if (lane.id === reopenedLane.id) {
+          return {
+            ...lane,
+            tasks: [...lane.tasks, { ...sourceTask, status: "in_progress" as TaskStatus, hidden: false }],
+          };
+        }
+
+        return lane;
+      });
+
+      setLanesAndPersist(nextLanes);
+      return;
+    }
+
     const nextLanes = lanes.map((lane) =>
       lane.id === laneId
         ? {
             ...lane,
-            tasks: lane.tasks.map((task) => (task.id === taskId ? { ...task, status } : task)),
+            tasks: lane.tasks.map((task) =>
+              task.id === taskId ? { ...task, status, hidden: status === "done" ? task.hidden : false } : task
+            ),
           }
         : lane
     );
@@ -1595,7 +1669,8 @@ export function BoardShell() {
 
     const sourceLane = lanes.find((lane) => lane.id === draggedTask.laneId);
     const sourceTask = sourceLane?.tasks.find((task) => task.id === draggedTask.taskId);
-    if (!sourceLane || !sourceTask) return;
+    const targetLane = lanes.find((lane) => lane.id === targetLaneId);
+    if (!sourceLane || !sourceTask || !targetLane) return;
 
     const withoutTask = lanes.map((lane) =>
       lane.id === draggedTask.laneId
@@ -1608,7 +1683,11 @@ export function BoardShell() {
 
       const nextTasks = [...lane.tasks];
       const insertionIndex = targetIndex ?? nextTasks.length;
-      nextTasks.splice(insertionIndex, 0, sourceTask);
+      nextTasks.splice(insertionIndex, 0, {
+        ...sourceTask,
+        status: (isDoneLaneTitle(targetLane.title) ? "done" : "in_progress") as TaskStatus,
+        hidden: false,
+      });
       return { ...lane, tasks: nextTasks };
     });
 
@@ -1725,7 +1804,7 @@ export function BoardShell() {
         <div>
           <p className={styles.boardTitle}>CRM Workflow Board</p>
           {isLoadingBoard || boardMessage ? (
-            <p className={styles.srOnly}>{isLoadingBoard ? "Loading saved board..." : boardMessage}</p>
+            <p className={styles.boardStatus}>{isLoadingBoard ? "Loading saved board..." : boardMessage}</p>
           ) : null}
         </div>
 
@@ -1803,6 +1882,7 @@ export function BoardShell() {
                   className={styles.laneTitle}
                   value={lane.title}
                   onChange={(event) => updateLaneTitle(lane.id, event.target.value)}
+                  onBlur={(event) => commitLaneTitle(lane.id, event.target.value)}
                 />
                 <button type="button" className={styles.deleteLaneButton} onClick={() => deleteLane(lane.id)}>
                   <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
