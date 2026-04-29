@@ -87,6 +87,7 @@ const emptyEditor: UpdateLeadInput = {
 };
 
 const leadCategoryOptions = ["client", "recovery", "lead", "Proposal rejected", "Disqualified"];
+const LEADS_PAGE_SIZE = 20;
 
 function fullName(lead: LeadRecord) {
   return [lead.firstName, lead.middleName, lead.lastName].filter(Boolean).join(" ");
@@ -162,6 +163,22 @@ function buildSuggestedCsvMapping(headers: string[]): CsvColumnMapping {
     revenue: guessCsvColumn(headers, ["valor servico", "valor serviço", "service value", "revenue", "valor"]),
     cost: guessCsvColumn(headers, ["custo", "cost", "custo servico", "service cost"]),
   };
+}
+
+function getUniqueCsvHeaders(headers: string[]) {
+  const seen = new Set<string>();
+
+  return headers.filter((header) => {
+    const cleaned = header.replace(/\r/g, "").trim();
+    const normalized = normalizeCsvHeader(cleaned);
+
+    if (!normalized || seen.has(normalized)) {
+      return false;
+    }
+
+    seen.add(normalized);
+    return true;
+  });
 }
 
 function normalizePhone(value: string) {
@@ -292,14 +309,23 @@ export function LeadsShell() {
     cost: "",
   });
   const [isImportingCsv, setIsImportingCsv] = useState(false);
+  const [leadsOffset, setLeadsOffset] = useState(0);
+  const [leadsPagination, setLeadsPagination] = useState({
+    total: 0,
+    limit: LEADS_PAGE_SIZE,
+    offset: 0,
+    hasMore: false,
+  });
 
-  async function loadLeads() {
+  async function loadLeads(nextOffset = leadsOffset) {
     setIsLoading(true);
     setMessage(null);
 
     try {
-      const response = await getLeads();
+      const response = await getLeads({ limit: LEADS_PAGE_SIZE, offset: nextOffset });
       setLeads(response.leads);
+      setLeadsPagination(response.pagination);
+      setLeadsOffset(nextOffset);
     } catch (error) {
       console.warn("[LeadsShell] failed to load leads:", error);
       setMessage("We could not load leads right now.");
@@ -316,7 +342,7 @@ export function LeadsShell() {
         return;
       }
 
-      await loadLeads();
+      await loadLeads(0);
     })();
 
     return () => {
@@ -376,6 +402,9 @@ export function LeadsShell() {
       return matchesName && matchesPhone && matchesTag;
     });
   }, [leads, nameSearch, phoneSearch, tagFilter]);
+
+  const pageStart = leadsPagination.total === 0 ? 0 : leadsPagination.offset + 1;
+  const pageEnd = leadsPagination.offset + filteredLeads.length;
 
   const leadSourceResults = useMemo(() => {
     const query = normalize(editorForm.leadSourceName ?? "");
@@ -519,7 +548,7 @@ export function LeadsShell() {
       });
 
       const firstLine = binary.split(/\r?\n/).map((line) => line.trimEnd()).find(Boolean) ?? "";
-      const headers = parseCsvLine(firstLine).filter(Boolean);
+      const headers = getUniqueCsvHeaders(parseCsvLine(firstLine).map((header) => header.replace(/\r/g, "").trim()));
 
       setImportColumns(headers);
       setImportMapping(buildSuggestedCsvMapping(headers));
@@ -1168,6 +1197,7 @@ export function LeadsShell() {
       <section className={styles.directoryHeader}>
         <h2>Directory ({isLoading ? "..." : filteredLeads.length})</h2>
         <div className={styles.directoryMeta}>
+          <span>{isLoading ? "Loading..." : `${pageStart}-${pageEnd} of ${leadsPagination.total}`}</span>
           <span className={styles.activeFilterPill}>{tagFilter === "all" ? "All tags" : tagFilter}</span>
           {message ? <p>{message}</p> : null}
         </div>
@@ -1224,6 +1254,25 @@ export function LeadsShell() {
         {!isLoading && filteredLeads.length === 0 ? (
           <div className={styles.emptyState}>No leads match this search yet.</div>
         ) : null}
+      </section>
+
+      <section className={styles.paginationRow}>
+        <button
+          type="button"
+          className={styles.filterToggle}
+          onClick={() => void loadLeads(Math.max(0, leadsOffset - LEADS_PAGE_SIZE))}
+          disabled={isLoading || leadsOffset === 0}
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          className={styles.filterToggle}
+          onClick={() => void loadLeads(leadsOffset + LEADS_PAGE_SIZE)}
+          disabled={isLoading || !leadsPagination.hasMore}
+        >
+          Next
+        </button>
       </section>
 
       {isLeadModalOpen ? (
@@ -1793,8 +1842,8 @@ export function LeadsShell() {
                       }
                     >
                       <option value="">Select a column</option>
-                      {importColumns.map((column) => (
-                        <option key={`lead-${column}`} value={column}>
+                      {importColumns.map((column, index) => (
+                        <option key={`lead-${index}-${column}`} value={column}>
                           {column}
                         </option>
                       ))}
@@ -1810,8 +1859,8 @@ export function LeadsShell() {
                       }
                     >
                       <option value="">Select a column</option>
-                      {importColumns.map((column) => (
-                        <option key={`task-${column}`} value={column}>
+                      {importColumns.map((column, index) => (
+                        <option key={`task-${index}-${column}`} value={column}>
                           {column}
                         </option>
                       ))}
@@ -1827,8 +1876,8 @@ export function LeadsShell() {
                       }
                     >
                       <option value="">Select a column</option>
-                      {importColumns.map((column) => (
-                        <option key={`revenue-${column}`} value={column}>
+                      {importColumns.map((column, index) => (
+                        <option key={`revenue-${index}-${column}`} value={column}>
                           {column}
                         </option>
                       ))}
@@ -1844,8 +1893,8 @@ export function LeadsShell() {
                       }
                     >
                       <option value="">Select a column</option>
-                      {importColumns.map((column) => (
-                        <option key={`cost-${column}`} value={column}>
+                      {importColumns.map((column, index) => (
+                        <option key={`cost-${index}-${column}`} value={column}>
                           {column}
                         </option>
                       ))}

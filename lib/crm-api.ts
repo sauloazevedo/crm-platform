@@ -316,10 +316,32 @@ export async function removeWorkspaceAccessUser(userId: string): Promise<{ id: s
   return response.json();
 }
 
-export async function getLeads(): Promise<{ leads: LeadRecord[] }> {
+export async function getLeads(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  leads: LeadRecord[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+}> {
   const headers = await getAuthHeaders({ includeJsonContentType: true });
+  const params = new URLSearchParams();
 
-  const response = await fetch(`${getApiBaseUrl()}/leads`, {
+  if (options?.limit) {
+    params.set("limit", String(options.limit));
+  }
+
+  if (typeof options?.offset === "number") {
+    params.set("offset", String(options.offset));
+  }
+
+  const query = params.toString();
+
+  const response = await fetch(`${getApiBaseUrl()}/leads${query ? `?${query}` : ""}`, {
     method: "GET",
     headers: headers ?? { "Content-Type": "application/json" },
   });

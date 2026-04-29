@@ -74,14 +74,21 @@
   font-weight: 700;
 }
 
+.overviewSection {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
 .pipelineSection {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .pipelineCard {
-  padding: 18px;
+  padding: 14px;
   border-radius: 7px;
   background: var(--surface-muted);
   border: 1px solid var(--line);
@@ -96,8 +103,86 @@
 
 .pipelineCard strong {
   display: block;
-  margin-top: 10px;
-  font-size: 2rem;
+  margin-top: 8px;
+  font-size: 1.4rem;
+}
+
+.chartCard {
+  padding: 18px;
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 18px;
+}
+
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.chartHeader h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.chartHeader span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.chartBars {
+  min-height: 250px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.chartBarItem {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+}
+
+.chartBarValue {
+  text-align: center;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.chartBarTrack {
+  height: 188px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(75, 242, 226, 0.05) 0%, rgba(75, 242, 226, 0.01) 100%),
+    var(--surface-muted);
+}
+
+.chartBarFill {
+  width: 100%;
+  min-height: 14px;
+  border-radius: 7px 7px 4px 4px;
+  background: linear-gradient(180deg, var(--accent-cool) 0%, var(--accent) 100%);
+  box-shadow: 0 12px 24px rgba(242, 131, 34, 0.18);
+}
+
+.chartBarLabel {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  word-break: break-word;
 }
 
 .workspace {
@@ -735,6 +820,10 @@
 }
 
 @media (max-width: 1100px) {
+  .overviewSection {
+    grid-template-columns: 1fr;
+  }
+
   .pipelineSection {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -784,5 +873,13 @@
   .tableHead,
   .tableRow {
     grid-template-columns: 1fr;
+  }
+
+  .chartHeader {
+    flex-direction: column;
+  }
+
+  .chartBars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

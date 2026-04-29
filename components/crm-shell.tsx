@@ -11,60 +11,12 @@ import {
   createLead as createLeadRequest,
   createLeadCompany,
   createLeadFile,
-  getLeads,
   getTaskBoard,
   type LeadCompanyRecord,
   type LeadFileRecord,
   type TaskBoardLane,
 } from "../lib/crm-api";
 import { compressImageFile } from "../lib/image-compression";
-
-type Lead = {
-  id: string;
-  firstName: string;
-  middleName: string;
-  lastName: string;
-  dateOfBirth?: string;
-  taxId?: string;
-  taxIdLast4?: string;
-  gender?: string;
-  phoneNumber: string;
-  email?: string;
-  address?: string;
-  status: string;
-  owner: string;
-  notes?: string;
-};
-
-const initialLeads: Lead[] = [
-  {
-    id: "lead-1",
-    firstName: "Maria",
-    middleName: "",
-    lastName: "Alvarez",
-    phoneNumber: "(305) 555-0101",
-    status: "Docs pending",
-    owner: "Ana",
-  },
-  {
-    id: "lead-2",
-    firstName: "Jonathan",
-    middleName: "",
-    lastName: "Lee",
-    phoneNumber: "(786) 555-0130",
-    status: "Review",
-    owner: "Chris",
-  },
-  {
-    id: "lead-3",
-    firstName: "Olivia",
-    middleName: "Grace",
-    lastName: "Santos",
-    phoneNumber: "(954) 555-0124",
-    status: "New lead",
-    owner: "Unassigned",
-  },
-];
 
 const emptyForm = {
   firstName: "",
@@ -104,69 +56,14 @@ function getTodayDate() {
 
 export function CrmShell() {
   const auth = useAuth();
-  const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [taskLanes, setTaskLanes] = useState<TaskBoardLane[]>([]);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadForm, setLeadForm] = useState(emptyForm);
   const [leadCompanies, setLeadCompanies] = useState<LeadCompanyRecord[]>([]);
   const [leadFiles, setLeadFiles] = useState<Array<LeadFileRecord & { fileDataBase64?: string }>>([]);
-  const [isLoadingLeads, setIsLoadingLeads] = useState(true);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [photoFeedback, setPhotoFeedback] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadLeads() {
-      if (!auth.isAuthenticated) {
-        return;
-      }
-
-      try {
-        const response = await getLeads();
-
-        if (!isMounted) {
-          return;
-        }
-
-        setLeads(
-          (response.leads as Array<Record<string, unknown>>).map((lead) => ({
-            id: String(lead.id),
-            firstName: String(lead.firstName ?? ""),
-            middleName: String(lead.middleName ?? ""),
-            lastName: String(lead.lastName ?? ""),
-            dateOfBirth: String(lead.dateOfBirth ?? ""),
-            taxId: String(lead.taxId ?? ""),
-            taxIdLast4: String(lead.taxIdLast4 ?? ""),
-            gender: String(lead.gender ?? ""),
-            phoneNumber: String(lead.phoneNumber ?? ""),
-            email: String(lead.email ?? ""),
-            address: String(lead.address ?? ""),
-            status: String(lead.status ?? "New lead"),
-            owner: String(lead.ownerId ?? "Unassigned"),
-            notes: typeof lead.notes === "string" ? lead.notes : undefined,
-          }))
-        );
-      } catch (error) {
-        console.error("[crm-shell] failed to load leads:", error);
-
-        if (isMounted) {
-          setFeedbackMessage("We could not load live leads yet. Showing local preview data.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingLeads(false);
-        }
-      }
-    }
-
-    void loadLeads();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [auth.isAuthenticated]);
 
   useEffect(() => {
     let isMounted = true;
@@ -198,28 +95,41 @@ export function CrmShell() {
     };
   }, [auth.isAuthenticated]);
 
-  const orderedLeads = useMemo(
-    () =>
-      [...leads].sort((a, b) => {
-        if (a.status === "New lead" && b.status !== "New lead") return -1;
-        if (a.status !== "New lead" && b.status === "New lead") return 1;
-        return a.lastName.localeCompare(b.lastName);
-      }),
-    [leads]
-  );
-
   const laneSummaries = useMemo(
     () =>
       taskLanes.map((lane) => ({
         stage: lane.title,
-        count: lane.tasks.filter((task) => task.status !== "done").length,
+        count: lane.tasks.length,
       })),
     [taskLanes]
   );
 
-  function fullName(lead: Lead) {
-    return [lead.firstName, lead.middleName, lead.lastName].filter(Boolean).join(" ");
-  }
+  const openTaskChart = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const lane of taskLanes) {
+      for (const task of lane.tasks) {
+        const isDoneLane = lane.title.trim().toLowerCase() === "done";
+        const isDoneTask = task.status === "done";
+
+        if (isDoneLane || isDoneTask) {
+          continue;
+        }
+
+        const key = task.title.trim() || "Untitled service";
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+
+    const items = Array.from(counts.entries())
+      .map(([title, count]) => ({ title, count }))
+      .sort((left, right) => right.count - left.count || left.title.localeCompare(right.title))
+      .slice(0, 8);
+
+    const maxCount = items.reduce((highest, item) => Math.max(highest, item.count), 1);
+
+    return { items, maxCount };
+  }, [taskLanes]);
 
   function openLeadModal() {
     setLeadForm((current) => ({ ...current, createdAt: current.createdAt || getTodayDate() }));
@@ -287,26 +197,6 @@ export function CrmShell() {
               fileDataBase64: file.fileDataBase64 ?? "",
             })
           ),
-      ]);
-
-      setLeads((current) => [
-        {
-          id: createdLeadId,
-          firstName: String(createdLead.firstName ?? ""),
-          middleName: String(createdLead.middleName ?? ""),
-          lastName: String(createdLead.lastName ?? ""),
-          leadPhotoDataUrl: String(createdLead.leadPhotoDataUrl ?? ""),
-          dateOfBirth: String(createdLead.dateOfBirth ?? ""),
-          taxId: String(createdLead.taxId ?? ""),
-          taxIdLast4: String(createdLead.taxIdLast4 ?? ""),
-          gender: String(createdLead.gender ?? ""),
-          phoneNumber: String(createdLead.phoneNumber ?? ""),
-          email: String(createdLead.email ?? ""),
-          address: String(createdLead.address ?? ""),
-          status: String(createdLead.status ?? "New lead"),
-          owner: "Unassigned",
-        },
-        ...current,
       ]);
 
       setFeedbackMessage("Lead created successfully.");
@@ -399,64 +289,50 @@ export function CrmShell() {
         </header>
 
         {laneSummaries.length > 0 ? (
-          <section className={styles.pipelineSection}>
-            {laneSummaries.map((item) => (
-              <article key={item.stage} className={styles.pipelineCard}>
-                <span>{item.stage}</span>
-                <strong>{item.count}</strong>
-              </article>
-            ))}
+          <section className={styles.overviewSection}>
+            <div className={styles.pipelineSection}>
+              {laneSummaries.map((item) => (
+                <article key={item.stage} className={styles.pipelineCard}>
+                  <span>{item.stage}</span>
+                  <strong>{item.count}</strong>
+                </article>
+              ))}
+            </div>
+
+            <article className={styles.chartCard}>
+              <div className={styles.chartHeader}>
+                <div>
+                  <p className={styles.eyebrow}>Open services</p>
+                  <h2>Tasks by service</h2>
+                </div>
+                <span>{openTaskChart.items.reduce((total, item) => total + item.count, 0)} open tasks</span>
+              </div>
+
+              {openTaskChart.items.length > 0 ? (
+                <div className={styles.chartBars}>
+                  {openTaskChart.items.map((item, index) => (
+                    <div key={`${item.title}-${index}`} className={styles.chartBarItem}>
+                      <div className={styles.chartBarValue}>{item.count}</div>
+                      <div className={styles.chartBarTrack}>
+                        <div
+                          className={styles.chartBarFill}
+                          style={{ height: `${Math.max((item.count / openTaskChart.maxCount) * 100, 14)}%` }}
+                        />
+                      </div>
+                      <div className={styles.chartBarLabel} title={item.title}>
+                        {item.title}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={styles.copy}>No open tasks yet. As soon as the team creates active tasks, this chart will show the service mix.</p>
+              )}
+            </article>
           </section>
         ) : null}
 
-        <section className={styles.workspace}>
-          <div className={styles.listCard}>
-            <div className={styles.cardHeader}>
-              <div>
-                <h2>Lead Queue</h2>
-                <p className={styles.cardSubtitle}>Recent inbound leads and priority follow-up.</p>
-              </div>
-              <span>{isLoadingLeads ? "Loading..." : `${orderedLeads.length} records`}</span>
-            </div>
-
-            {feedbackMessage ? <p className={styles.cardSubtitle}>{feedbackMessage}</p> : null}
-
-            <div className={styles.table}>
-              <div className={styles.tableHead}>
-                <span>Lead</span>
-                <span>Phone</span>
-                <span>Status</span>
-                <span>Owner</span>
-              </div>
-
-              {orderedLeads.map((lead) => (
-                <div key={lead.id} className={styles.tableRow}>
-                  <span>{fullName(lead)}</span>
-                  <span>{formatPhoneNumber(lead.phoneNumber)}</span>
-                  <span>{lead.status}</span>
-                  <span>{lead.owner}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <aside className={styles.sidePanel}>
-            <div className={styles.noteCard}>
-              <span className={styles.noteEyebrow}>Lead intake</span>
-              <strong>Open the modal to register a new lead with name and phone in a clean intake flow.</strong>
-              <p>Every new lead enters the queue immediately with default ownership and a fresh workflow status.</p>
-            </div>
-
-            <div className={styles.noteCard}>
-              <span className={styles.noteEyebrow}>Next build</span>
-              <strong>Lead conversion, task board, and engagement timeline.</strong>
-              <p>
-                The workflow board is now available from this CRM page so the team can manage
-                lanes and operational tasks in a Trello-style view.
-              </p>
-            </div>
-          </aside>
-        </section>
+        {feedbackMessage ? <p className={styles.copy}>{feedbackMessage}</p> : null}
       </main>
 
       {isLeadModalOpen ? (
