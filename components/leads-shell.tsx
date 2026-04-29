@@ -49,6 +49,13 @@ type WalletDraftItem = {
   revenue: string;
 };
 
+type CsvColumnMapping = {
+  leadName: string;
+  taskTitle: string;
+  revenue: string;
+  cost: string;
+};
+
 const defaultWalletItems: WalletDraftItem[] = [
   { id: "wallet-primary", description: "", cost: "", revenue: "" },
   {
@@ -93,6 +100,68 @@ function initials(lead: LeadRecord) {
 
 function normalize(value: string) {
   return value.trim().toLowerCase();
+}
+
+function normalizeCsvHeader(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .trim()
+    .toLowerCase();
+}
+
+function parseCsvLine(line: string) {
+  const columns: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    const nextCharacter = line[index + 1];
+
+    if (character === '"') {
+      if (inQuotes && nextCharacter === '"') {
+        current += '"';
+        index += 1;
+        continue;
+      }
+
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (character === "," && !inQuotes) {
+      columns.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += character;
+  }
+
+  columns.push(current.trim());
+  return columns;
+}
+
+function guessCsvColumn(headers: string[], aliases: string[]) {
+  const normalizedAliases = aliases.map((alias) => normalizeCsvHeader(alias));
+
+  return (
+    headers.find((header) => normalizedAliases.includes(normalizeCsvHeader(header))) ??
+    headers.find((header) =>
+      normalizedAliases.some((alias) => normalizeCsvHeader(header).includes(alias) || alias.includes(normalizeCsvHeader(header)))
+    ) ??
+    ""
+  );
+}
+
+function buildSuggestedCsvMapping(headers: string[]): CsvColumnMapping {
+  return {
+    leadName: guessCsvColumn(headers, ["lead_name", "lead name", "cliente", "client", "nome", "nome cliente"]),
+    taskTitle: guessCsvColumn(headers, ["task_title", "task title", "servico", "serviço", "service", "task"]),
+    revenue: guessCsvColumn(headers, ["valor servico", "valor serviço", "service value", "revenue", "valor"]),
+    cost: guessCsvColumn(headers, ["custo", "cost", "custo servico", "service cost"]),
+  };
 }
 
 function normalizePhone(value: string) {
@@ -215,6 +284,13 @@ export function LeadsShell() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importYear, setImportYear] = useState(new Date().getFullYear());
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importColumns, setImportColumns] = useState<string[]>([]);
+  const [importMapping, setImportMapping] = useState<CsvColumnMapping>({
+    leadName: "",
+    taskTitle: "",
+    revenue: "",
+    cost: "",
+  });
   const [isImportingCsv, setIsImportingCsv] = useState(false);
 
   async function loadLeads() {
@@ -386,6 +462,11 @@ export function LeadsShell() {
       return;
     }
 
+    if (!importMapping.leadName || !importMapping.taskTitle || !importMapping.revenue || !importMapping.cost) {
+      setMessage("Map the CSV columns for lead name, task title, service value, and cost before importing.");
+      return;
+    }
+
     setIsImportingCsv(true);
     setMessage(null);
 
@@ -398,18 +479,55 @@ export function LeadsShell() {
       });
 
       const csvBase64 = btoa(binary);
-      const response = await importLeadsCsv({ csvBase64, importYear });
+      const response = await importLeadsCsv({ csvBase64, importYear, columnMapping: importMapping });
       await loadLeads();
       setIsImportModalOpen(false);
       setImportFile(null);
+      setImportColumns([]);
+      setImportMapping({ leadName: "", taskTitle: "", revenue: "", cost: "" });
       setMessage(
         `${response.createdLeads} leads created, ${response.createdTasks} tasks created, ${response.updatedTasks} tasks updated.`
       );
     } catch (error) {
       console.warn("[LeadsShell] failed to import CSV:", error);
-      setMessage(error instanceof Error ? error.message : "We could not import this CSV right now.");
+      if (error instanceof TypeError && error.message === "Failed to fetch") {
+        setMessage("We could not reach the CSV import API. If the online backend has not been deployed with /leads/import yet, publish the latest crm-IaC first.");
+      } else {
+        setMessage(error instanceof Error ? error.message : "We could not import this CSV right now.");
+      }
     } finally {
       setIsImportingCsv(false);
+    }
+  }
+
+  async function handleImportFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    setImportFile(file);
+
+    if (!file) {
+      setImportColumns([]);
+      setImportMapping({ leadName: "", taskTitle: "", revenue: "", cost: "" });
+      return;
+    }
+
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+
+      const firstLine = binary.split(/\r?\n/).map((line) => line.trimEnd()).find(Boolean) ?? "";
+      const headers = parseCsvLine(firstLine).filter(Boolean);
+
+      setImportColumns(headers);
+      setImportMapping(buildSuggestedCsvMapping(headers));
+    } catch (error) {
+      console.warn("[LeadsShell] failed to read CSV headers:", error);
+      setImportColumns([]);
+      setImportMapping({ leadName: "", taskTitle: "", revenue: "", cost: "" });
+      setMessage("We could not read the CSV columns.");
     }
   }
 
@@ -1649,7 +1767,7 @@ export function LeadsShell() {
                 <input
                   type="file"
                   accept=".csv,text/csv"
-                  onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+                  onChange={handleImportFileChange}
                 />
               </label>
 
@@ -1664,8 +1782,81 @@ export function LeadsShell() {
                 />
               </label>
 
+              {importColumns.length > 0 ? (
+                <div className={styles.importMappingGrid}>
+                  <label>
+                    <span>Lead name column</span>
+                    <select
+                      value={importMapping.leadName}
+                      onChange={(event) =>
+                        setImportMapping((current) => ({ ...current, leadName: event.target.value }))
+                      }
+                    >
+                      <option value="">Select a column</option>
+                      {importColumns.map((column) => (
+                        <option key={`lead-${column}`} value={column}>
+                          {column}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Task title column</span>
+                    <select
+                      value={importMapping.taskTitle}
+                      onChange={(event) =>
+                        setImportMapping((current) => ({ ...current, taskTitle: event.target.value }))
+                      }
+                    >
+                      <option value="">Select a column</option>
+                      {importColumns.map((column) => (
+                        <option key={`task-${column}`} value={column}>
+                          {column}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Service value column</span>
+                    <select
+                      value={importMapping.revenue}
+                      onChange={(event) =>
+                        setImportMapping((current) => ({ ...current, revenue: event.target.value }))
+                      }
+                    >
+                      <option value="">Select a column</option>
+                      {importColumns.map((column) => (
+                        <option key={`revenue-${column}`} value={column}>
+                          {column}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    <span>Cost column</span>
+                    <select
+                      value={importMapping.cost}
+                      onChange={(event) =>
+                        setImportMapping((current) => ({ ...current, cost: event.target.value }))
+                      }
+                    >
+                      <option value="">Select a column</option>
+                      {importColumns.map((column) => (
+                        <option key={`cost-${column}`} value={column}>
+                          {column}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : null}
+
               <p className={styles.importHint}>
                 We will use January 1 of the selected year as the created date for imported leads and tasks.
+                {importColumns.length > 0 ? " Review the mapped columns before importing." : ""}
               </p>
 
               <div className={styles.importActions}>

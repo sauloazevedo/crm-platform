@@ -350,6 +350,12 @@ export async function createLead(input: CreateLeadInput) {
 export async function importLeadsCsv(input: {
   csvBase64: string;
   importYear: number;
+  columnMapping?: {
+    leadName: string;
+    taskTitle: string;
+    revenue: string;
+    cost: string;
+  };
 }): Promise<{
   message: string;
   processedRows: number;

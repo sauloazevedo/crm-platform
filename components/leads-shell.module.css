@@ -448,13 +448,20 @@
   font-size: 0.92rem;
 }
 
-.importForm input {
+.importForm input,
+.importForm select {
   min-height: 48px;
   padding: 13px 14px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface-strong);
   color: var(--text);
+}
+
+.importMappingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .importHint {
@@ -468,6 +475,12 @@
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .importMappingGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .confirmModal h2,
