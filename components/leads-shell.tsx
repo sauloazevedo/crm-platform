@@ -1179,6 +1179,24 @@ export function LeadsShell() {
         <h2>Directory ({isLoading ? "..." : filteredLeads.length})</h2>
         <div className={styles.directoryMeta}>
           <span>{isLoading ? "Loading..." : `${pageStart}-${pageEnd} of ${leadsPagination.total}`}</span>
+          <div className={styles.paginationRow}>
+            <button
+              type="button"
+              className={styles.filterToggle}
+              onClick={() => void loadLeads(Math.max(0, leadsOffset - LEADS_PAGE_SIZE))}
+              disabled={isLoading || leadsOffset === 0}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className={styles.filterToggle}
+              onClick={() => void loadLeads(leadsOffset + LEADS_PAGE_SIZE)}
+              disabled={isLoading || !leadsPagination.hasMore}
+            >
+              Next
+            </button>
+          </div>
           <span className={styles.activeFilterPill}>{tagFilter === "all" ? "All tags" : tagFilter}</span>
           {message ? <p>{message}</p> : null}
         </div>
@@ -1235,25 +1253,6 @@ export function LeadsShell() {
         {!isLoading && filteredLeads.length === 0 ? (
           <div className={styles.emptyState}>No leads match this search yet.</div>
         ) : null}
-      </section>
-
-      <section className={styles.paginationRow}>
-        <button
-          type="button"
-          className={styles.filterToggle}
-          onClick={() => void loadLeads(Math.max(0, leadsOffset - LEADS_PAGE_SIZE))}
-          disabled={isLoading || leadsOffset === 0}
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          className={styles.filterToggle}
-          onClick={() => void loadLeads(leadsOffset + LEADS_PAGE_SIZE)}
-          disabled={isLoading || !leadsPagination.hasMore}
-        >
-          Next
-        </button>
       </section>
 
       {isLeadModalOpen ? (
