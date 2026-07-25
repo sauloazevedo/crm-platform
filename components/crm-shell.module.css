@@ -484,7 +484,9 @@
 
 .field input,
 .field select,
+.fieldWide input,
 .fieldWide select,
+.fieldFull select,
 .fieldFull input,
 .addressAutocomplete input {
   min-height: 48px;

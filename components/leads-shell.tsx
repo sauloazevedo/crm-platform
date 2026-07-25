@@ -1390,7 +1390,7 @@ export function LeadsShell() {
                     </select>
                   </label>
 
-                  <label className={crmStyles.fieldWide}>
+                  <label className={crmStyles.field}>
                     <span>Gender</span>
                     <select
                       value={editorForm.gender}
@@ -1403,7 +1403,7 @@ export function LeadsShell() {
                     </select>
                   </label>
 
-                  <label className={crmStyles.fieldWide}>
+                  <label className={crmStyles.field}>
                     <span>Situation</span>
                     <input
                       value={editorForm.situation ?? ""}
@@ -1438,7 +1438,7 @@ export function LeadsShell() {
                     </select>
                   </label>
 
-                  <label className={crmStyles.fieldFull}>
+                  <label className={crmStyles.field}>
                     <span>
                       {editorForm.customerAcquisitionType === "Campaign" ? "Campaign source" : "Referral / source"}
                     </span>
