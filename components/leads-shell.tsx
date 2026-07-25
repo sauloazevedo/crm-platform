@@ -75,9 +75,12 @@ const emptyEditor: UpdateLeadInput = {
   dateOfBirth: "",
   taxId: "",
   gender: "Male",
+  situation: "",
   phoneNumber: "",
   email: "",
   address: "",
+  customerAcquisitionType: "",
+  customerAcquisitionName: "",
   leadSourceId: "",
   leadSourceName: "",
   source: "lead",
@@ -87,6 +90,7 @@ const emptyEditor: UpdateLeadInput = {
 };
 
 const leadCategoryOptions = ["client", "recovery", "lead", "Proposal rejected", "Disqualified"];
+const customerAcquisitionOptions = ["Referral", "Campaign"];
 const LEADS_PAGE_SIZE = 20;
 
 function fullName(lead: LeadRecord) {
@@ -406,19 +410,6 @@ export function LeadsShell() {
   const pageStart = leadsPagination.total === 0 ? 0 : leadsPagination.offset + 1;
   const pageEnd = leadsPagination.offset + filteredLeads.length;
 
-  const leadSourceResults = useMemo(() => {
-    const query = normalize(editorForm.leadSourceName ?? "");
-
-    if (query.length < 3) {
-      return [];
-    }
-
-    return leads
-      .filter((lead) => lead.id !== selectedLead?.id)
-      .filter((lead) => normalize(fullName(lead)).includes(query))
-      .slice(0, 6);
-  }, [editorForm.leadSourceName, leads, selectedLead?.id]);
-
   async function openLeadEditor(lead: LeadRecord) {
     setSelectedLead(lead);
     setIsLeadModalOpen(true);
@@ -437,9 +428,12 @@ export function LeadsShell() {
       dateOfBirth: lead.dateOfBirth ? String(lead.dateOfBirth).slice(0, 10) : "",
       taxId: lead.taxId ?? "",
       gender: lead.gender ?? "Male",
+      situation: lead.situation ?? "",
       phoneNumber: formatPhoneNumber(lead.phoneNumber),
       email: lead.email ?? "",
       address: lead.address ?? "",
+      customerAcquisitionType: lead.customerAcquisitionType ?? "",
+      customerAcquisitionName: lead.customerAcquisitionName ?? "",
       leadSourceId: lead.leadSourceId ?? "",
       leadSourceName: lead.leadSourceName ?? "",
       source: leadCategoryOptions.includes(lead.source ?? "") ? lead.source ?? "lead" : "lead",
@@ -651,6 +645,9 @@ export function LeadsShell() {
         phoneNumber: editorForm.phoneNumber?.trim() ?? "",
         email: editorForm.email?.trim(),
         address: editorForm.address?.trim(),
+        situation: editorForm.situation?.trim(),
+        customerAcquisitionType: editorForm.customerAcquisitionType?.trim() || undefined,
+        customerAcquisitionName: editorForm.customerAcquisitionName?.trim() || undefined,
         leadSourceId: editorForm.leadSourceId?.trim() || undefined,
         leadSourceName: editorForm.leadSourceName?.trim() || undefined,
       };
@@ -686,22 +683,6 @@ export function LeadsShell() {
           task,
         }))
     );
-  }
-
-  function selectLeadSource(lead: LeadRecord) {
-    setEditorForm((current) => ({
-      ...current,
-      leadSourceId: lead.id,
-      leadSourceName: fullName(lead),
-    }));
-  }
-
-  function removeLeadSource() {
-    setEditorForm((current) => ({
-      ...current,
-      leadSourceId: "",
-      leadSourceName: "",
-    }));
   }
 
   function toggleLeadTaskEditor(task: TaskBoardLane["tasks"][number]) {
@@ -1421,6 +1402,67 @@ export function LeadsShell() {
                       <option>Prefer not to say</option>
                     </select>
                   </label>
+
+                  <label className={crmStyles.fieldWide}>
+                    <span>Situation</span>
+                    <input
+                      value={editorForm.situation ?? ""}
+                      onBlur={() => setEditorForm((current) => ({ ...current, situation: current.situation?.trim() }))}
+                      onChange={(event) => setEditorForm((current) => ({ ...current, situation: event.target.value }))}
+                      placeholder="SSN, ITIN, student, NRA..."
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className={crmStyles.intakeSectionStack}>
+                <h3>Customer acquisition</h3>
+                <div className={crmStyles.contactGrid}>
+                  <label className={crmStyles.field}>
+                    <span>Type</span>
+                    <select
+                      value={editorForm.customerAcquisitionType ?? ""}
+                      onChange={(event) =>
+                        setEditorForm((current) => ({
+                          ...current,
+                          customerAcquisitionType: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Select one</option>
+                      {customerAcquisitionOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className={crmStyles.fieldFull}>
+                    <span>
+                      {editorForm.customerAcquisitionType === "Campaign" ? "Campaign source" : "Referral / source"}
+                    </span>
+                    <input
+                      value={editorForm.customerAcquisitionName ?? ""}
+                      onBlur={() =>
+                        setEditorForm((current) => ({
+                          ...current,
+                          customerAcquisitionName: current.customerAcquisitionName?.trim(),
+                        }))
+                      }
+                      onChange={(event) =>
+                        setEditorForm((current) => ({
+                          ...current,
+                          customerAcquisitionName: event.target.value,
+                        }))
+                      }
+                      placeholder={
+                        editorForm.customerAcquisitionType === "Campaign"
+                          ? "Campaign, Facebook, Google..."
+                          : "Referral name"
+                      }
+                    />
+                  </label>
                 </div>
               </section>
 
@@ -1492,47 +1534,6 @@ export function LeadsShell() {
                       >
                         <Copy size={17} />
                       </button>
-                    </div>
-                  </label>
-
-                  <label className={crmStyles.fieldFull}>
-                    <span>Lead Source</span>
-                    <div className={boardStyles.leadSearchBox}>
-                      {editorForm.leadSourceId ? (
-                        <div className={boardStyles.selectedLeadBox}>
-                          <div>
-                            <strong>{editorForm.leadSourceName}</strong>
-                            <span>Referring lead from your base</span>
-                          </div>
-                          <button type="button" onClick={removeLeadSource} aria-label="Remove selected lead source">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <input
-                            value={editorForm.leadSourceName ?? ""}
-                            onChange={(event) =>
-                              setEditorForm((current) => ({
-                                ...current,
-                                leadSourceId: "",
-                                leadSourceName: event.target.value,
-                              }))
-                            }
-                            placeholder="Search lead who referred this client"
-                          />
-                          {leadSourceResults.length > 0 ? (
-                            <div className={boardStyles.leadSearchResults}>
-                              {leadSourceResults.map((lead) => (
-                                <button key={lead.id} type="button" onClick={() => selectLeadSource(lead)}>
-                                  <strong>{fullName(lead)}</strong>
-                                  <span>{formatPhoneNumber(lead.phoneNumber) || "Lead record"}</span>
-                                </button>
-                              ))}
-                            </div>
-                          ) : null}
-                        </>
-                      )}
                     </div>
                   </label>
                 </div>

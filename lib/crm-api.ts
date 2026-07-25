@@ -25,10 +25,13 @@ export type CreateLeadInput = {
   taxId?: string;
   taxIdLast4?: string;
   gender?: string;
+  situation?: string;
   phoneNumber?: string;
   email?: string;
   address?: string;
   source?: string;
+  customerAcquisitionType?: string;
+  customerAcquisitionName?: string;
   leadSourceId?: string;
   leadSourceName?: string;
   serviceInterest?: string;
@@ -49,10 +52,13 @@ export type LeadRecord = {
   taxId?: string | null;
   taxIdLast4?: string | null;
   gender?: string | null;
+  situation?: string | null;
   phoneNumber: string;
   email?: string | null;
   address?: string | null;
   source?: string | null;
+  customerAcquisitionType?: string | null;
+  customerAcquisitionName?: string | null;
   leadSourceId?: string | null;
   leadSourceName?: string | null;
   serviceInterest?: string | null;
