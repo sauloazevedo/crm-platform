@@ -37,7 +37,7 @@ import { compressImageFile } from "../lib/image-compression";
 import styles from "./board-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
 
-type TaskStatus = "in_progress" | "done";
+type TaskStatus = "todo" | "in_progress" | "done";
 type TaskStatusFilter = "all" | TaskStatus;
 
 type WalletItem = {
@@ -94,12 +94,6 @@ type DraftTask = {
 
 const defaultWalletItems: WalletDraftItem[] = [
   { id: "wallet-primary", description: "", cost: "", revenue: "" },
-  {
-    id: "wallet-office-expenses",
-    description: "Office expenses (printer and ink)",
-    cost: "12",
-    revenue: "",
-  },
 ];
 
 const leadCategoryOptions = ["client", "recovery", "lead", "Proposal rejected", "Disqualified"];
@@ -114,7 +108,7 @@ const emptyTaskDraft: DraftTask = {
   newLeadName: "",
   newLeadPhone: "",
   isCreatingLead: false,
-  status: "in_progress",
+  status: "todo",
   walletItems: defaultWalletItems,
 };
 
@@ -186,7 +180,31 @@ function hexToRgba(hexColor: string, opacity: number) {
 }
 
 function getFullName(lead: LeadRecord) {
-  return [lead.firstName, lead.middleName, lead.lastName].filter(Boolean).join(" ");
+  return [lead.firstName, lead.lastName].filter(Boolean).join(" ");
+}
+
+function normalizeTaskStatus(status?: string | null): TaskStatus {
+  if (status === "done") {
+    return "done";
+  }
+
+  if (status === "todo") {
+    return "todo";
+  }
+
+  return "in_progress";
+}
+
+function getTaskStatusLabel(status: TaskStatus) {
+  if (status === "done") {
+    return "Done";
+  }
+
+  if (status === "todo") {
+    return "TODO";
+  }
+
+  return "In progress";
 }
 
 function getLeadInitials(name: string) {
@@ -290,7 +308,7 @@ function normalizeBoard(lanes: Lane[]): Lane[] {
       tasks: lane.tasks.map((task) => ({
         ...task,
         createdAt: task.createdAt ?? getTodayDate(),
-        status: task.status === "done" ? "done" : "in_progress",
+        status: normalizeTaskStatus(task.status),
         hidden: task.hidden === true,
         walletItems: task.walletItems ?? [],
       })),
@@ -414,7 +432,7 @@ export function BoardShell() {
 
     async function loadLeads() {
       try {
-        const response = await getLeads();
+        const response = await getLeads({ limit: 1000 });
 
         if (isMounted) {
           setLeads(response.leads);
@@ -684,7 +702,7 @@ export function BoardShell() {
       ...current,
       [task.id]: current[task.id] ?? {
         notes: task.notes,
-        status: task.status,
+        status: normalizeTaskStatus(task.status),
         walletItems: toWalletDraftItems(task.walletItems),
       },
     }));
@@ -699,7 +717,7 @@ export function BoardShell() {
       [taskId]: {
         ...(current[taskId] ?? {
           notes: "",
-          status: "in_progress",
+          status: "todo",
           walletItems: defaultWalletItems.map((item) => ({ ...item })),
         }),
         ...patch,
@@ -1471,7 +1489,7 @@ export function BoardShell() {
       notes: task.notes,
       leadId: task.leadId,
       leadSearch: getTaskLeadName(task),
-      status: task.status,
+      status: normalizeTaskStatus(task.status),
       walletItems: toWalletDraftItems(task.walletItems),
     });
   }
@@ -2220,15 +2238,16 @@ export function BoardShell() {
             <label>
               <span>Status</span>
               <select
-                value={laneDrafts[activeTaskModalLaneId]?.status ?? "in_progress"}
+                value={laneDrafts[activeTaskModalLaneId]?.status ?? "todo"}
                 onChange={(event) =>
                   updateLaneDraft(
                     activeTaskModalLaneId,
                     "status",
-                    event.target.value === "done" ? "done" : "in_progress"
+                    event.target.value === "done" ? "done" : event.target.value === "todo" ? "todo" : "in_progress"
                   )
                 }
               >
+                <option value="todo">TODO</option>
                 <option value="in_progress">In progress</option>
                 <option value="done">Done</option>
               </select>
@@ -2367,12 +2386,18 @@ export function BoardShell() {
                     current
                       ? {
                           ...current,
-                          status: event.target.value === "done" ? "done" : "in_progress",
+                          status:
+                            event.target.value === "done"
+                              ? "done"
+                              : event.target.value === "todo"
+                                ? "todo"
+                                : "in_progress",
                         }
                       : current
                   )
                 }
               >
+                <option value="todo">TODO</option>
                 <option value="in_progress">In progress</option>
                 <option value="done">Done</option>
               </select>
@@ -2391,7 +2416,7 @@ export function BoardShell() {
                 Cancel
               </button>
               <button type="button" className={styles.addTaskButton} onClick={saveTaskEdit}>
-                Save task
+                Save changes
               </button>
             </div>
           </aside>
@@ -2441,29 +2466,6 @@ export function BoardShell() {
                         type="button"
                         onClick={() => void copyLeadValue(leadEditorForm.firstName, "First name")}
                         aria-label="Copy first name"
-                      >
-                        <Copy size={17} />
-                      </button>
-                    </div>
-                  </label>
-
-                  <label className={crmStyles.field}>
-                    <span>Middle name</span>
-                    <div className={crmStyles.copyInputWrap}>
-                      <input
-                        value={leadEditorForm.middleName}
-                        onBlur={() =>
-                          setLeadEditorForm((current) => ({ ...current, middleName: current.middleName?.trim() }))
-                        }
-                        onChange={(event) =>
-                          setLeadEditorForm((current) => ({ ...current, middleName: event.target.value }))
-                        }
-                        placeholder="Middle name"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void copyLeadValue(leadEditorForm.middleName, "Middle name")}
-                        aria-label="Copy middle name"
                       >
                         <Copy size={17} />
                       </button>
@@ -2776,7 +2778,7 @@ export function BoardShell() {
                   {getLeadTaskEntries(selectedLead.id).map(({ laneId, laneTitle, task }) => {
                     const draft = leadTaskDrafts[task.id] ?? {
                       notes: task.notes,
-                      status: task.status,
+                      status: normalizeTaskStatus(task.status),
                       walletItems: toWalletDraftItems(task.walletItems),
                     };
                     const isExpanded = expandedLeadTaskId === task.id;
@@ -2788,7 +2790,7 @@ export function BoardShell() {
                             <strong>{task.title}</strong>
                             <span>{laneTitle}</span>
                           </div>
-                          <small>{task.status === "done" ? "Done" : "In progress"}</small>
+                          <small>{getTaskStatusLabel(draft.status)}</small>
                           {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                         </button>
 
@@ -2800,10 +2802,16 @@ export function BoardShell() {
                                 value={draft.status}
                                 onChange={(event) =>
                                   updateLeadTaskDraft(task.id, {
-                                    status: event.target.value === "done" ? "done" : "in_progress",
+                                    status:
+                                      event.target.value === "done"
+                                        ? "done"
+                                        : event.target.value === "todo"
+                                          ? "todo"
+                                          : "in_progress",
                                   })
                                 }
                               >
+                                <option value="todo">TODO</option>
                                 <option value="in_progress">In progress</option>
                                 <option value="done">Done</option>
                               </select>
@@ -2834,7 +2842,7 @@ export function BoardShell() {
                               onRemove: (itemId) => removeLeadTaskWalletItem(task.id, itemId),
                             })}
                             <button type="button" onClick={() => saveLeadTaskUpdate(laneId, task.id)}>
-                              Save task
+                              Save changes
                             </button>
                           </div>
                         ) : null}
@@ -2859,7 +2867,10 @@ export function BoardShell() {
 
               <LeadWalletPanel
                 leadName={getFullName(selectedLead)}
-                tasks={getLeadTaskEntries(selectedLead.id).map(({ task }) => task)}
+                tasks={getLeadTaskEntries(selectedLead.id).map(({ task }) => ({
+                  ...task,
+                  status: task.status === "done" ? "done" : "in_progress",
+                }))}
                 invoices={leadEditorInvoices}
                 message={leadWalletMessage}
                 onAddInvoice={addLeadInvoice}
@@ -2875,7 +2886,7 @@ export function BoardShell() {
                   Cancel
                 </button>
                 <button type="submit" className={crmStyles.primaryModalButton}>
-                  Save lead
+                  Save changes
                 </button>
               </div>
             </form>
@@ -2904,6 +2915,7 @@ export function BoardShell() {
                   onChange={(event) => setTaskSearchStatus(event.target.value as TaskStatusFilter)}
                 >
                   <option value="all">All status</option>
+                  <option value="todo">TODO</option>
                   <option value="in_progress">In progress</option>
                   <option value="done">Done</option>
                 </select>
@@ -2938,7 +2950,7 @@ export function BoardShell() {
                     <strong>{task.title}</strong>
                     <span>{leadName || "No attached lead"}</span>
                     <small>
-                      {laneTitle} - {task.status === "done" ? "Done" : "In progress"}
+                      {laneTitle} - {getTaskStatusLabel(normalizeTaskStatus(task.status))}
                       {task.hidden ? " - Hidden" : " - Live"}
                     </small>
                   </div>

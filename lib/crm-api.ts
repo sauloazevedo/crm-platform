@@ -105,6 +105,7 @@ export type LeadFileRecord = {
   originalFileName?: string | null;
   contentType?: string | null;
   fileSize?: number | null;
+  fileDataBase64?: string;
   uploadedAt?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -168,7 +169,7 @@ export type TaskBoardTask = {
   notes: string;
   leadId?: string | null;
   leadName?: string | null;
-  status?: "in_progress" | "done";
+  status?: "todo" | "in_progress" | "done";
   hidden?: boolean;
   walletItems?: Array<{
     id: string;
@@ -345,6 +346,7 @@ export async function removeWorkspaceAccessUser(userId: string): Promise<{ id: s
 export async function getLeads(options?: {
   limit?: number;
   offset?: number;
+  search?: string;
 }): Promise<{
   leads: LeadRecord[];
   pagination: {
@@ -363,6 +365,10 @@ export async function getLeads(options?: {
 
   if (typeof options?.offset === "number") {
     params.set("offset", String(options.offset));
+  }
+
+  if (options?.search?.trim()) {
+    params.set("q", options.search.trim());
   }
 
   const query = params.toString();
@@ -536,6 +542,21 @@ export async function getLeadFiles(leadId: string): Promise<{ files: LeadFileRec
 
   if (!response.ok) {
     throw new Error(`Failed to fetch lead files: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function getLeadFile(leadId: string, fileId: string): Promise<{ file: LeadFileRecord }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  const response = await fetch(`${getApiBaseUrl()}/leads/${leadId}/files/${fileId}`, {
+    method: "GET",
+    headers: headers ?? { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch lead file: ${response.status}`);
   }
 
   return response.json();

@@ -794,7 +794,7 @@
 
 .fileRow {
   display: grid;
-  grid-template-columns: 1fr 220px 44px;
+  grid-template-columns: minmax(0, 1fr) 220px 88px 44px;
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -805,6 +805,27 @@
 .fileRow span {
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.fileActionGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fileActionGroup button,
+.fileRow > button {
+  min-height: 34px;
+  width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
 }
 
 .modalActions {

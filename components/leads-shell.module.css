@@ -229,6 +229,16 @@
   flex-wrap: wrap;
 }
 
+.inlineSearch {
+  min-width: 280px;
+  min-height: 40px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
 .paginationRow {
   display: flex;
   align-items: center;

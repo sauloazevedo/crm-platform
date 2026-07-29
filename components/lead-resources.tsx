@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Copy, FileText, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Download, Eye, FileText, Plus, Trash2 } from "lucide-react";
 import {
   createLeadCompany,
   createLeadFile,
   deleteLeadCompany,
   deleteLeadFile,
+  getLeadFile,
   updateLeadCompany,
   updateLeadFile,
   type LeadCompanyInput,
@@ -49,8 +50,8 @@ const emptyCompany: LeadCompanyInput = {
   filingDate: "",
   principalAddress: "",
   mailingAddress: "",
-  entityType: entityTypeOptions[0],
-  businessType: businessTypeOptions[0],
+  entityType: "",
+  businessType: "",
   otherDescription: "",
   partners: {},
 };
@@ -103,6 +104,14 @@ function addPartnerValue(partners: Record<string, string> | string[] | undefined
   }, {});
 }
 
+function buildFileDataUrl(file: { contentType?: string | null; fileDataBase64?: string }) {
+  if (!file.fileDataBase64) {
+    return null;
+  }
+
+  return `data:${file.contentType || "application/octet-stream"};base64,${file.fileDataBase64}`;
+}
+
 function removePartnerValue(partners: Record<string, string> | string[] | undefined, partnerIndex: number) {
   return getPartnerValues(partners)
     .filter((_, index) => index !== partnerIndex)
@@ -133,6 +142,66 @@ export function LeadResources({
   const [resourceMessage, setResourceMessage] = useState<string | null>(null);
   const [partnerDrafts, setPartnerDrafts] = useState<Record<string, string>>({});
   const [collapsedCompanies, setCollapsedCompanies] = useState<Record<string, boolean>>({});
+
+  async function getFileWithData(fileId: string) {
+    const existing = files.find((item) => item.id === fileId);
+
+    if (!existing) {
+      throw new Error("File not found.");
+    }
+
+    if (existing.fileDataBase64 || !leadId || fileId.startsWith("draft-")) {
+      return existing;
+    }
+
+    const response = await getLeadFile(leadId, fileId);
+    const hydrated = { ...existing, ...response.file };
+    onFilesChange(files.map((item) => (item.id === fileId ? hydrated : item)));
+    return hydrated;
+  }
+
+  async function viewFile(fileId: string) {
+    setResourceMessage(null);
+
+    try {
+      const file = await getFileWithData(fileId);
+      const dataUrl = buildFileDataUrl(file);
+
+      if (!dataUrl) {
+        setResourceMessage("We could not open this file preview.");
+        return;
+      }
+
+      window.open(dataUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.warn("[LeadResources] failed to preview file:", error);
+      setResourceMessage("We could not open this file preview.");
+    }
+  }
+
+  async function downloadFile(fileId: string) {
+    setResourceMessage(null);
+
+    try {
+      const file = await getFileWithData(fileId);
+      const dataUrl = buildFileDataUrl(file);
+
+      if (!dataUrl) {
+        setResourceMessage("We could not download this file.");
+        return;
+      }
+
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = file.originalFileName || file.fileName || "file";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.warn("[LeadResources] failed to download file:", error);
+      setResourceMessage("We could not download this file.");
+    }
+  }
 
   function updateCompanyLocally(companyId: string, patch: Partial<LeadCompanyInput>) {
     onCompaniesChange(companies.map((company) => (company.id === companyId ? { ...company, ...patch } : company)));
@@ -471,22 +540,24 @@ export function LeadResources({
                         <label>
                           <span>Type of Entity</span>
                           <select
-                            value={company.entityType ?? entityTypeOptions[0]}
+                            value={company.entityType ?? ""}
                             onChange={(event) => updateCompany(company.id, { entityType: event.target.value })}
                           >
+                            <option value="">Select one</option>
                             {entityTypeOptions.map((option) => (
-                              <option key={option}>{option}</option>
+                              <option key={option} value={option}>{option}</option>
                             ))}
                           </select>
                         </label>
                         <label>
                           <span>Business Type</span>
                           <select
-                            value={company.businessType ?? businessTypeOptions[0]}
+                            value={company.businessType ?? ""}
                             onChange={(event) => updateCompany(company.id, { businessType: event.target.value })}
                           >
+                            <option value="">Select one</option>
                             {businessTypeOptions.map((option) => (
-                              <option key={option}>{option}</option>
+                              <option key={option} value={option}>{option}</option>
                             ))}
                           </select>
                         </label>
@@ -580,6 +651,14 @@ export function LeadResources({
                   aria-label="File name"
                 />
                 <span>{formatDateTime(file.uploadedAt)}</span>
+                <div className={styles.fileActionGroup}>
+                  <button type="button" onClick={() => void viewFile(file.id)} aria-label="View file">
+                    <Eye size={17} />
+                  </button>
+                  <button type="button" onClick={() => void downloadFile(file.id)} aria-label="Download file">
+                    <Download size={17} />
+                  </button>
+                </div>
                 <button type="button" onClick={() => removeFile(file.id)} aria-label="Delete file">
                   <Trash2 size={17} />
                 </button>

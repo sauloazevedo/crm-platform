@@ -41,7 +41,7 @@ import boardStyles from "./board-shell.module.css";
 import styles from "./leads-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
 
-type TaskStatus = "in_progress" | "done";
+type TaskStatus = "todo" | "in_progress" | "done";
 type WalletDraftItem = {
   id: string;
   description: string;
@@ -58,12 +58,6 @@ type CsvColumnMapping = {
 
 const defaultWalletItems: WalletDraftItem[] = [
   { id: "wallet-primary", description: "", cost: "", revenue: "" },
-  {
-    id: "wallet-office-expenses",
-    description: "Office expenses (printer and ink)",
-    cost: "12",
-    revenue: "",
-  },
 ];
 
 const emptyEditor: UpdateLeadInput = {
@@ -90,11 +84,10 @@ const emptyEditor: UpdateLeadInput = {
 };
 
 const leadCategoryOptions = ["client", "recovery", "lead", "Proposal rejected", "Disqualified"];
-const customerAcquisitionOptions = ["Referral", "Campaign"];
 const LEADS_PAGE_SIZE = 20;
 
 function fullName(lead: LeadRecord) {
-  return [lead.firstName, lead.middleName, lead.lastName].filter(Boolean).join(" ");
+  return [lead.firstName, lead.lastName].filter(Boolean).join(" ");
 }
 
 function initials(lead: LeadRecord) {
@@ -203,6 +196,39 @@ function formatPhoneNumber(value?: string | null) {
   return value ?? "";
 }
 
+function getLeadState(address?: string | null) {
+  if (!address?.trim()) {
+    return "No state";
+  }
+
+  const match = address.match(/\b([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?\s*$/i);
+  return match?.[1]?.toUpperCase() ?? "No state";
+}
+
+function getTaskStatusLabel(status: TaskStatus) {
+  if (status === "done") {
+    return "Done";
+  }
+
+  if (status === "todo") {
+    return "TODO";
+  }
+
+  return "In progress";
+}
+
+function normalizeTaskStatus(status?: string | null): TaskStatus {
+  if (status === "done") {
+    return "done";
+  }
+
+  if (status === "todo") {
+    return "todo";
+  }
+
+  return "in_progress";
+}
+
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -293,8 +319,7 @@ export function LeadsShell() {
   >({});
   const [taskBoard, setTaskBoard] = useState<TaskBoardLane[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [nameSearch, setNameSearch] = useState("");
-  const [phoneSearch, setPhoneSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [tagFilter, setTagFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
@@ -326,7 +351,7 @@ export function LeadsShell() {
     setMessage(null);
 
     try {
-      const response = await getLeads({ limit: LEADS_PAGE_SIZE, offset: nextOffset });
+      const response = await getLeads({ limit: LEADS_PAGE_SIZE, offset: nextOffset, search: searchQuery });
       setLeads(response.leads);
       setLeadsPagination(response.pagination);
       setLeadsOffset(nextOffset);
@@ -353,6 +378,14 @@ export function LeadsShell() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadLeads(0);
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   useEffect(() => {
     let isMounted = true;
@@ -395,17 +428,12 @@ export function LeadsShell() {
   }, [leads]);
 
   const filteredLeads = useMemo(() => {
-    const normalizedName = normalize(nameSearch);
-    const normalizedPhone = normalizePhone(phoneSearch);
-
     return leads.filter((lead) => {
-      const matchesName = !normalizedName || normalize(fullName(lead)).includes(normalizedName);
-      const matchesPhone = !normalizedPhone || normalizePhone(lead.phoneNumber).includes(normalizedPhone);
       const matchesTag = tagFilter === "all" || formatTagLabel(lead.source) === tagFilter;
 
-      return matchesName && matchesPhone && matchesTag;
+      return matchesTag;
     });
-  }, [leads, nameSearch, phoneSearch, tagFilter]);
+  }, [leads, tagFilter]);
 
   const pageStart = leadsPagination.total === 0 ? 0 : leadsPagination.offset + 1;
   const pageEnd = leadsPagination.offset + filteredLeads.length;
@@ -691,7 +719,7 @@ export function LeadsShell() {
       ...current,
       [task.id]: current[task.id] ?? {
         notes: task.notes,
-        status: task.status === "done" ? "done" : "in_progress",
+        status: normalizeTaskStatus(task.status),
         walletItems: toWalletDraftItems(task.walletItems),
       },
     }));
@@ -1129,22 +1157,12 @@ export function LeadsShell() {
       {isFilterOpen ? (
         <section className={styles.filterCard}>
           <label>
-            <span>Name search</span>
+            <span>Search</span>
             <input
-              value={nameSearch}
-              onBlur={() => setNameSearch(nameSearch.trim())}
-              onChange={(event) => setNameSearch(event.target.value)}
-              placeholder="Search by lead name"
-            />
-          </label>
-
-          <label>
-            <span>Phone search</span>
-            <input
-              value={phoneSearch}
-              onBlur={() => setPhoneSearch(phoneSearch.trim())}
-              onChange={(event) => setPhoneSearch(event.target.value)}
-              placeholder="Search by phone"
+              value={searchQuery}
+              onBlur={() => setSearchQuery(searchQuery.trim())}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search by name, phone, or email"
             />
           </label>
 
@@ -1164,8 +1182,7 @@ export function LeadsShell() {
               type="button"
               className={styles.clearFiltersButton}
               onClick={() => {
-                setNameSearch("");
-                setPhoneSearch("");
+                setSearchQuery("");
                 setTagFilter("all");
               }}
             >
@@ -1179,6 +1196,12 @@ export function LeadsShell() {
         <h2>Directory ({isLoading ? "..." : filteredLeads.length})</h2>
         <div className={styles.directoryMeta}>
           <span>{isLoading ? "Loading..." : `${pageStart}-${pageEnd} of ${leadsPagination.total}`}</span>
+          <input
+            className={styles.inlineSearch}
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search by name, phone, or email"
+          />
           <div className={styles.paginationRow}>
             <button
               type="button"
@@ -1238,6 +1261,14 @@ export function LeadsShell() {
                 <Mail size={15} strokeWidth={2} aria-hidden="true" />
                 <span>{lead.email?.trim() || "No email yet"}</span>
               </div>
+              <div className={styles.contactRow}>
+                <span>Client since</span>
+                <span>{lead.createdAt ? new Date(lead.createdAt).toLocaleDateString("en-US") : "No date"}</span>
+              </div>
+              <div className={styles.contactRow}>
+                <span>State</span>
+                <span>{getLeadState(lead.address)}</span>
+              </div>
               <div className={styles.cardFooter}>
                 <span
                   className={styles.tagPill}
@@ -1294,25 +1325,6 @@ export function LeadsShell() {
                         type="button"
                         onClick={() => void copyLeadValue(editorForm.firstName, "First name")}
                         aria-label="Copy first name"
-                      >
-                        <Copy size={17} />
-                      </button>
-                    </div>
-                  </label>
-
-                  <label className={crmStyles.field}>
-                    <span>Middle name</span>
-                    <div className={crmStyles.copyInputWrap}>
-                      <input
-                        value={editorForm.middleName}
-                        onBlur={() => setEditorForm((current) => ({ ...current, middleName: current.middleName?.trim() }))}
-                        onChange={(event) => setEditorForm((current) => ({ ...current, middleName: event.target.value }))}
-                        placeholder="Middle name"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void copyLeadValue(editorForm.middleName, "Middle name")}
-                        aria-label="Copy middle name"
                       >
                         <Copy size={17} />
                       </button>
@@ -1414,56 +1426,14 @@ export function LeadsShell() {
                 </div>
               </section>
 
-              <section className={crmStyles.intakeSectionStack}>
-                <h3>Customer acquisition</h3>
-                <div className={crmStyles.contactGrid}>
-                  <label className={crmStyles.field}>
-                    <span>Type</span>
-                    <select
-                      value={editorForm.customerAcquisitionType ?? ""}
-                      onChange={(event) =>
-                        setEditorForm((current) => ({
-                          ...current,
-                          customerAcquisitionType: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">Select one</option>
-                      {customerAcquisitionOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className={crmStyles.field}>
-                    <span>
-                      {editorForm.customerAcquisitionType === "Campaign" ? "Campaign source" : "Referral / source"}
-                    </span>
-                    <input
-                      value={editorForm.customerAcquisitionName ?? ""}
-                      onBlur={() =>
-                        setEditorForm((current) => ({
-                          ...current,
-                          customerAcquisitionName: current.customerAcquisitionName?.trim(),
-                        }))
-                      }
-                      onChange={(event) =>
-                        setEditorForm((current) => ({
-                          ...current,
-                          customerAcquisitionName: event.target.value,
-                        }))
-                      }
-                      placeholder={
-                        editorForm.customerAcquisitionType === "Campaign"
-                          ? "Campaign, Facebook, Google..."
-                          : "Referral name"
-                      }
-                    />
-                  </label>
-                </div>
-              </section>
+              <LeadResources
+                leadId={selectedLead?.id}
+                companies={editorCompanies}
+                files={editorFiles}
+                onCompaniesChange={setEditorCompanies}
+                onFilesChange={setEditorFiles}
+                sections={["companies"]}
+              />
 
               <section className={crmStyles.intakeSectionStack}>
                 <h3>Contact</h3>
@@ -1628,7 +1598,7 @@ export function LeadsShell() {
                   {getLeadTaskEntries(selectedLead.id).map(({ laneId, laneTitle, task }) => {
                     const draft = leadTaskDrafts[task.id] ?? {
                       notes: task.notes,
-                      status: task.status === "done" ? "done" : "in_progress",
+                      status: normalizeTaskStatus(task.status),
                       walletItems: toWalletDraftItems(task.walletItems),
                     };
                     const isExpanded = expandedLeadTaskId === task.id;
@@ -1640,7 +1610,7 @@ export function LeadsShell() {
                             <strong>{task.title}</strong>
                             <span>{laneTitle}</span>
                           </div>
-                          <small>{task.status === "done" ? "Done" : "In progress"}</small>
+                                  <small>{getTaskStatusLabel(draft.status)}</small>
                           {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                         </button>
 
@@ -1652,10 +1622,16 @@ export function LeadsShell() {
                                 value={draft.status}
                                 onChange={(event) =>
                                   updateLeadTaskDraft(task.id, {
-                                    status: event.target.value === "done" ? "done" : "in_progress",
+                                    status:
+                                      event.target.value === "done"
+                                        ? "done"
+                                        : event.target.value === "todo"
+                                          ? "todo"
+                                          : "in_progress",
                                   })
                                 }
                               >
+                                <option value="todo">TODO</option>
                                 <option value="in_progress">In progress</option>
                                 <option value="done">Done</option>
                               </select>
@@ -1742,7 +1718,7 @@ export function LeadsShell() {
                               </div>
                             </section>
                             <button type="button" onClick={() => void saveLeadTaskUpdate(laneId, task.id)}>
-                              Save task
+                              Save changes
                             </button>
                           </div>
                         ) : null}
@@ -1758,20 +1734,12 @@ export function LeadsShell() {
               ) : null}
 
               {selectedLead ? (
-              <LeadResources
-                leadId={selectedLead.id}
-                companies={editorCompanies}
-                files={editorFiles}
-                onCompaniesChange={setEditorCompanies}
-                onFilesChange={setEditorFiles}
-                sections={["companies"]}
-              />
-              ) : null}
-
-              {selectedLead ? (
                 <LeadWalletPanel
                   leadName={fullName(selectedLead)}
-                  tasks={getLeadTaskEntries(selectedLead.id).map(({ task }) => task)}
+                  tasks={getLeadTaskEntries(selectedLead.id).map(({ task }) => ({
+                    ...task,
+                    status: task.status === "done" ? "done" : "in_progress",
+                  }))}
                   invoices={editorInvoices}
                   message={leadWalletMessage}
                   onAddInvoice={addLeadInvoice}
@@ -1788,7 +1756,7 @@ export function LeadsShell() {
                   Cancel
                 </button>
                 <button type="submit" className={crmStyles.primaryModalButton}>
-                  {selectedLead ? "Save lead" : "Create lead"}
+                  {selectedLead ? "Save changes" : "Create lead"}
                 </button>
               </div>
             </form>
