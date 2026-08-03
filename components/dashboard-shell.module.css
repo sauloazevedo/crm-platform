@@ -40,28 +40,21 @@
   gap: 12px;
 }
 
-.navCard {
-  display: grid;
-  gap: 4px;
-  padding: 13px 14px;
+.navLink {
+  display: block;
+  padding: 11px 14px;
   border-radius: 7px;
   background: var(--surface-strong);
   border: 1px solid var(--line);
   color: var(--text);
   font-size: 0.875rem;
+  font-weight: 700;
   text-decoration: none;
 }
 
-.navCard small {
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
-.navCardDisabled {
-  color: var(--muted);
-  background: var(--surface-muted);
-  cursor: not-allowed;
-  opacity: 0.72;
+.navLink:hover {
+  border-color: var(--panel-soft);
+  background: var(--surface);
 }
 
 .logoutButton {
@@ -136,7 +129,19 @@
 
 .toolCard:hover {
   transform: translateY(-3px);
-  border-color: rgba(75, 242, 226, 0.44);
+  border-color: var(--panel-soft);
+}
+
+.toolCardDisabled {
+  background: var(--surface-muted);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.toolCardDisabled:hover {
+  transform: none;
+  border-color: var(--line);
 }
 
 .toolTop {

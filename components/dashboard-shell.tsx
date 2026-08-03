@@ -48,19 +48,10 @@ export function DashboardShell() {
         </div>
 
         <nav className={styles.nav}>
-          {tools.map((tool) =>
-            tool.status === "Core module" ? (
-              <Link key={tool.name} href={tool.href} className={styles.navCard}>
-                <strong>{tool.name}</strong>
-                <small>{tool.status}</small>
-              </Link>
-            ) : (
-              <span key={tool.name} className={`${styles.navCard} ${styles.navCardDisabled}`} aria-disabled="true">
-                <strong>{tool.name}</strong>
-                <small>{tool.status}</small>
-              </span>
-            )
-          )}
+          <Link href="/dashboard" className={styles.navLink}>Dashboard</Link>
+          <Link href="/profile" className={styles.navLink}>Profile</Link>
+          <Link href="/leads" className={styles.navLink}>Leads</Link>
+          <Link href="/crm" className={styles.navLink}>CRM</Link>
           <LogoutButton className={styles.logoutButton} />
         </nav>
       </aside>
@@ -75,15 +66,25 @@ export function DashboardShell() {
         </header>
 
         <section className={styles.toolsGrid}>
-          {tools.map((tool) => (
-            <Link key={tool.name} href={tool.href} className={styles.toolCard}>
-              <div className={styles.toolTop}>
-                <h3>{tool.name}</h3>
-                <span>{tool.status}</span>
+          {tools.map((tool) => {
+            const content = (
+              <>
+                <div className={styles.toolTop}>
+                  <h3>{tool.name}</h3>
+                  <span>{tool.status}</span>
+                </div>
+                <p>{tool.description}</p>
+              </>
+            );
+
+            return tool.status === "Core module" ? (
+              <Link key={tool.name} href={tool.href} className={styles.toolCard}>{content}</Link>
+            ) : (
+              <div key={tool.name} className={`${styles.toolCard} ${styles.toolCardDisabled}`} aria-disabled="true">
+                {content}
               </div>
-              <p>{tool.description}</p>
-            </Link>
-          ))}
+            );
+          })}
         </section>
       </section>
     </main>
