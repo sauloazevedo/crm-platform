@@ -305,6 +305,7 @@ function getTagAccentVar(value?: string | null) {
 export function LeadsShell() {
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [searchResults, setSearchResults] = useState<LeadRecord[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<LeadRecord | null>(null);
@@ -393,6 +394,7 @@ export function LeadsShell() {
 
     if (normalizedQuery.length < 2) {
       setSearchResults([]);
+      setSearchError(null);
       return;
     }
 
@@ -401,9 +403,11 @@ export function LeadsShell() {
         try {
           const response = await getLeads({ limit: 8, offset: 0, search: normalizedQuery });
           setSearchResults(response.leads);
+          setSearchError(null);
         } catch (error) {
           console.warn("[LeadsShell] failed to search lead suggestions:", error);
           setSearchResults([]);
+          setSearchError(error instanceof Error ? error.message : "Search is unavailable right now.");
         }
       })();
     }, 180);
@@ -545,7 +549,9 @@ export function LeadsShell() {
         />
         {searchQuery.trim().length >= 2 ? (
           <div className={styles.searchResults}>
-            {searchResults.length > 0 ? (
+            {searchError ? (
+              <div className={styles.searchResultEmpty}>{searchError}</div>
+            ) : searchResults.length > 0 ? (
               searchResults.map((lead) => (
                 <button
                   key={lead.id}

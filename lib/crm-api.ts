@@ -368,7 +368,8 @@ export async function getLeads(options?: {
   }
 
   if (options?.search?.trim()) {
-    params.set("search", options.search.trim());
+    // `q` is the query parameter used by the currently deployed API.
+    params.set("q", options.search.trim());
   }
 
   const query = params.toString();
