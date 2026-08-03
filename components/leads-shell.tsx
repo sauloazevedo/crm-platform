@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Copy, Filter, Mail, Phone, Plus, Trash2 } from "lucide-react";
 import {
   createLead,
@@ -306,6 +306,7 @@ export function LeadsShell() {
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [searchResults, setSearchResults] = useState<LeadRecord[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const searchDirectoryRef = useRef<LeadRecord[] | null>(null);
   const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<LeadRecord | null>(null);
@@ -353,9 +354,38 @@ export function LeadsShell() {
     setMessage(null);
 
     try {
-      const response = await getLeads({ limit: LEADS_PAGE_SIZE, offset: nextOffset, search: nextSearch });
-      setLeads(response.leads);
-      setLeadsPagination(response.pagination);
+      const normalizedSearch = nextSearch.trim();
+      if (normalizedSearch) {
+        if (!searchDirectoryRef.current) {
+          const directoryResponse = await getLeads({ limit: 1000, offset: 0 });
+          searchDirectoryRef.current = directoryResponse.leads;
+        }
+
+        const searchValue = normalizedSearch
+          .toLocaleLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+        const matchingLeads = (searchDirectoryRef.current ?? []).filter((lead) =>
+          [fullName(lead), lead.email ?? "", lead.phoneNumber ?? ""]
+            .join(" ")
+            .toLocaleLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .includes(searchValue)
+        );
+
+        setLeads(matchingLeads.slice(nextOffset, nextOffset + LEADS_PAGE_SIZE));
+        setLeadsPagination({
+          total: matchingLeads.length,
+          limit: LEADS_PAGE_SIZE,
+          offset: nextOffset,
+          hasMore: nextOffset + LEADS_PAGE_SIZE < matchingLeads.length,
+        });
+      } else {
+        const response = await getLeads({ limit: LEADS_PAGE_SIZE, offset: nextOffset });
+        setLeads(response.leads);
+        setLeadsPagination(response.pagination);
+      }
       setLeadsOffset(nextOffset);
     } catch (error) {
       console.warn("[LeadsShell] failed to load leads:", error);
@@ -401,8 +431,31 @@ export function LeadsShell() {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         try {
-          const response = await getLeads({ limit: 8, offset: 0, search: normalizedQuery });
-          setSearchResults(response.leads);
+          // Some published API stages still ignore the search query. Load the
+          // directory from the DB once, then match the user's term reliably.
+          if (!searchDirectoryRef.current) {
+            const response = await getLeads({ limit: 1000, offset: 0 });
+            searchDirectoryRef.current = response.leads;
+          }
+
+          const searchValue = normalizedQuery
+            .toLocaleLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+          const matches = (searchDirectoryRef.current ?? []).filter((lead) => {
+            const searchableValue = [
+              fullName(lead),
+              lead.email ?? "",
+              lead.phoneNumber ?? "",
+            ]
+              .join(" ")
+              .toLocaleLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+            return searchableValue.includes(searchValue);
+          });
+
+          setSearchResults(matches.slice(0, 8));
           setSearchError(null);
         } catch (error) {
           console.warn("[LeadsShell] failed to search lead suggestions:", error);

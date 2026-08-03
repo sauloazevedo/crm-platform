@@ -1,9 +1,9 @@
 .page {
-  --tag-accent-1: #f28322;
-  --tag-accent-2: #4bf2e2;
-  --tag-accent-3: #f25d27;
-  --tag-accent-4: #8bb8ff;
-  --tag-accent-5: #ffd166;
+  --tag-accent-1: #87bcbf;
+  --tag-accent-2: #d97d54;
+  --tag-accent-3: #324755;
+  --tag-accent-4: #6e8ca0;
+  --tag-accent-5: #b9b0a2;
   min-height: 100vh;
   padding: 24px;
 }
@@ -31,7 +31,7 @@
   margin: 0 0 10px;
   text-transform: uppercase;
   letter-spacing: 0.14em;
-  color: var(--accent-cool);
+  color: #6e8ca0;
   font-size: 0.76rem;
   font-weight: 800;
 }
@@ -280,8 +280,8 @@
 }
 
 .searchResultButton:hover {
-  border-color: var(--accent-cool);
-  background: #ecf0f1;
+  border-color: #87bcbf;
+  background: #f0f3f4;
 }
 
 .searchResultButton strong {
