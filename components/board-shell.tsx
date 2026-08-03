@@ -183,6 +183,17 @@ function getFullName(lead: LeadRecord) {
   return [lead.firstName, lead.lastName].filter(Boolean).join(" ");
 }
 
+function normalizeLeadSearch(value: string) {
+  return value.trim().toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function matchesLeadSearch(lead: LeadRecord, query: string) {
+  const searchableValue = normalizeLeadSearch(
+    [getFullName(lead), lead.email ?? "", lead.phoneNumber ?? ""].join(" ")
+  );
+  return searchableValue.includes(normalizeLeadSearch(query));
+}
+
 function normalizeTaskStatus(status?: string | null): TaskStatus {
   if (status === "done") {
     return "done";
@@ -370,6 +381,16 @@ export function BoardShell() {
   const hasPersistedLaneColorsRef = useRef(false);
   const isPersistingBoardRef = useRef(false);
   const queuedBoardRef = useRef<Lane[] | null>(null);
+  const leadDirectoryRef = useRef<LeadRecord[] | null>(null);
+
+  async function getLeadDirectory() {
+    if (!leadDirectoryRef.current) {
+      const response = await getLeads({ limit: 1000, offset: 0 });
+      leadDirectoryRef.current = response.leads;
+    }
+
+    return leadDirectoryRef.current;
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -415,8 +436,8 @@ export function BoardShell() {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         try {
-          const response = await getLeads({ limit: 8, search: query });
-          setDraftLeadSearchResults(response.leads);
+          const directory = await getLeadDirectory();
+          setDraftLeadSearchResults(directory.filter((lead) => matchesLeadSearch(lead, query)).slice(0, 8));
         } catch (error) {
           console.warn("[BoardShell] failed to search leads for draft:", error);
           setDraftLeadSearchResults([]);
@@ -438,8 +459,8 @@ export function BoardShell() {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         try {
-          const response = await getLeads({ limit: 8, search: query });
-          setEditingLeadSearchResults(response.leads);
+          const directory = await getLeadDirectory();
+          setEditingLeadSearchResults(directory.filter((lead) => matchesLeadSearch(lead, query)).slice(0, 8));
         } catch (error) {
           console.warn("[BoardShell] failed to search leads for edit:", error);
           setEditingLeadSearchResults([]);
@@ -461,8 +482,10 @@ export function BoardShell() {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         try {
-          const response = await getLeads({ limit: 8, search: query });
-          setLeadSourceResults(response.leads.filter((lead) => lead.id !== selectedLead?.id));
+          const directory = await getLeadDirectory();
+          setLeadSourceResults(
+            directory.filter((lead) => lead.id !== selectedLead?.id && matchesLeadSearch(lead, query)).slice(0, 8)
+          );
         } catch (error) {
           console.warn("[BoardShell] failed to search lead source:", error);
           setLeadSourceResults([]);
