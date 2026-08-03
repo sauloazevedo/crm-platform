@@ -304,6 +304,7 @@ function getTagAccentVar(value?: string | null) {
 
 export function LeadsShell() {
   const [leads, setLeads] = useState<LeadRecord[]>([]);
+  const [searchResults, setSearchResults] = useState<LeadRecord[]>([]);
   const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<LeadRecord | null>(null);
@@ -383,6 +384,29 @@ export function LeadsShell() {
     const timeoutId = window.setTimeout(() => {
       void loadLeads(0, searchQuery);
     }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const normalizedQuery = searchQuery.trim();
+
+    if (normalizedQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await getLeads({ limit: 8, offset: 0, search: normalizedQuery });
+          setSearchResults(response.leads);
+        } catch (error) {
+          console.warn("[LeadsShell] failed to search lead suggestions:", error);
+          setSearchResults([]);
+        }
+      })();
+    }, 180);
 
     return () => window.clearTimeout(timeoutId);
   }, [searchQuery]);
@@ -505,6 +529,45 @@ export function LeadsShell() {
     setEditorFiles([]);
     setEditorLogs([]);
     setEditorInvoices([]);
+  }
+
+  function renderSearchBox(className?: string) {
+    return (
+      <div className={`${styles.searchInputWrap} ${className ?? ""}`.trim()}>
+        <input
+          className={styles.inlineSearch}
+          value={searchQuery}
+          onBlur={() => {
+            window.setTimeout(() => setSearchQuery((current) => current.trim()), 120);
+          }}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search by name, phone, or email"
+        />
+        {searchQuery.trim().length >= 2 ? (
+          <div className={styles.searchResults}>
+            {searchResults.length > 0 ? (
+              searchResults.map((lead) => (
+                <button
+                  key={lead.id}
+                  type="button"
+                  className={styles.searchResultButton}
+                  onClick={() => {
+                    setSearchQuery(fullName(lead));
+                    setSearchResults([]);
+                    void openLeadEditor(lead);
+                  }}
+                >
+                  <strong>{fullName(lead)}</strong>
+                  <span>{lead.email?.trim() || formatPhoneNumber(lead.phoneNumber) || "Lead record"}</span>
+                </button>
+              ))
+            ) : (
+              <div className={styles.searchResultEmpty}>No lead found with this search.</div>
+            )}
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   async function handleImportCsv() {
@@ -1158,12 +1221,7 @@ export function LeadsShell() {
         <section className={styles.filterCard}>
           <label>
             <span>Search</span>
-            <input
-              value={searchQuery}
-              onBlur={() => setSearchQuery(searchQuery.trim())}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search by name, phone, or email"
-            />
+            {renderSearchBox(styles.filterSearchBox)}
           </label>
 
           <label>
@@ -1196,12 +1254,7 @@ export function LeadsShell() {
         <h2>Directory ({isLoading ? "..." : filteredLeads.length})</h2>
         <div className={styles.directoryMeta}>
           <span>{isLoading ? "Loading..." : `${pageStart}-${pageEnd} of ${leadsPagination.total}`}</span>
-          <input
-            className={styles.inlineSearch}
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search by name, phone, or email"
-          />
+          {renderSearchBox()}
           <div className={styles.paginationRow}>
             <button
               type="button"
