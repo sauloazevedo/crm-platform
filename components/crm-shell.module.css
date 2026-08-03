@@ -63,8 +63,9 @@
 }
 
 .toolsButton {
-  border-color: rgba(75, 242, 226, 0.28) !important;
-  color: var(--accent-cool) !important;
+  border-color: var(--panel) !important;
+  background: var(--panel) !important;
+  color: #fff !important;
 }
 
 .actions button {
@@ -696,9 +697,23 @@
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.03);
+  background: #ffffff;
   color: var(--text);
   padding: 12px 14px;
+}
+
+.companyHeader select {
+  appearance: none;
+  background-color: #ffffff;
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.companyHeader select:focus,
+.companyHeader input:focus {
+  outline: 2px solid var(--accent-cool);
+  outline-offset: 1px;
 }
 
 .companyGrid {

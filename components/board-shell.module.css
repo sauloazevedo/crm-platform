@@ -65,8 +65,9 @@
 
 .headerActions {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .navActions {
@@ -110,6 +111,19 @@
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.laneActions {
+  display: grid;
+  gap: 6px;
+}
+
+.laneActions label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .addLaneBox input,

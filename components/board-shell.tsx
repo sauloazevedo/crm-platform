@@ -1888,11 +1888,17 @@ export function BoardShell() {
         <div className={styles.headerActions}>
           <div className={styles.navActions}>
             <Link href="/dashboard" className={styles.secondaryAction}>
-              Back to dashboard
+              Dashboard
+            </Link>
+            <Link href="/leads" className={styles.addTaskButton}>
+              New lead
             </Link>
           </div>
-          <div className={styles.addLaneBox}>
+          <div className={styles.laneActions}>
+            <label htmlFor="new-lane-title">Add workflow lane</label>
+            <div className={styles.addLaneBox}>
             <input
+              id="new-lane-title"
               value={newLaneTitle}
               onChange={(event) => setNewLaneTitle(event.target.value)}
               placeholder="New lane title"
@@ -1900,6 +1906,7 @@ export function BoardShell() {
             <button type="button" onClick={addLane}>
               Create lane
             </button>
+            </div>
           </div>
         </div>
       </header>

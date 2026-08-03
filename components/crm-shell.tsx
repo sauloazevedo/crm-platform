@@ -278,13 +278,10 @@ export function CrmShell() {
           </div>
 
           <div className={styles.actions}>
-            <Link href="/dashboard">Back to dashboard</Link>
+            <Link href="/dashboard">Dashboard</Link>
             <Link href="/crm/tasks" className={styles.toolsButton}>
               Tasks
             </Link>
-            <button type="button" onClick={openLeadModal}>
-              New lead
-            </button>
           </div>
         </header>
 

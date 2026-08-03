@@ -609,6 +609,7 @@
   border-radius: 7px;
   background: #ffffff;
   color: var(--text);
+  color-scheme: light;
 }
 
 .editorForm textarea {
