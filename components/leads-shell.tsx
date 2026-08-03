@@ -1313,7 +1313,6 @@ export function LeadsShell() {
         <h2>Directory ({isLoading ? "..." : filteredLeads.length})</h2>
         <div className={styles.directoryMeta}>
           <span>{isLoading ? "Loading..." : `${pageStart}-${pageEnd} of ${leadsPagination.total}`}</span>
-          {renderSearchBox()}
           <div className={styles.paginationRow}>
             <button
               type="button"

@@ -16,6 +16,7 @@
 }
 
 :root[data-theme="light"] {
+  /* Light CRM design system: primary, secondary, and typography colors. */
   --bg: #f0f3f4;
   --surface: #ffffff;
   --surface-strong: #f9f9f9;
@@ -26,7 +27,7 @@
   --muted: #6e8ca0;
   --line: rgba(50, 71, 85, 0.16);
   --accent: #d97d54;
-  --accent-strong: #c96d46;
+  --accent-strong: #d97d54;
   --accent-cool: #87bcbf;
   --success: #87bcbf;
   --shadow: 0 4px 6px rgba(27, 28, 32, 0.1);
@@ -59,7 +60,7 @@ body {
     ),
     linear-gradient(180deg, #011c40 0%, #081526 52%, #06101d 100%);
   color: var(--text);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "Europa", "Avenir Next", "Segoe UI", sans-serif;
   transition: background 180ms ease, color 180ms ease;
 }
 
