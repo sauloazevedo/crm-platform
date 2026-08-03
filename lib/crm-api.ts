@@ -368,7 +368,7 @@ export async function getLeads(options?: {
   }
 
   if (options?.search?.trim()) {
-    params.set("q", options.search.trim());
+    params.set("search", options.search.trim());
   }
 
   const query = params.toString();

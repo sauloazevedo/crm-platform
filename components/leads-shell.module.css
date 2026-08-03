@@ -24,9 +24,7 @@
   gap: 18px;
   padding: 24px;
   margin-bottom: 18px;
-  background:
-    radial-gradient(circle at top right, rgba(252, 192, 0, 0.14), transparent 30%),
-    linear-gradient(180deg, #ffffff 0%, #eef5ff 100%);
+  background: #ffffff;
 }
 
 .eyebrow {
@@ -124,7 +122,7 @@
   padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  background: #ffffff;
   box-shadow: var(--shadow);
   color: var(--text);
   cursor: pointer;
@@ -168,7 +166,7 @@
   gap: 16px;
   padding: 20px;
   margin-bottom: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  background: #ffffff;
 }
 
 .filterCard label {
@@ -275,15 +273,15 @@
   padding: 10px 12px;
   border: 1px solid transparent;
   border-radius: 7px;
-  background: linear-gradient(180deg, #ffffff 0%, #f4f7fc 100%);
+  background: #ffffff;
   color: var(--text);
   text-align: left;
   cursor: pointer;
 }
 
 .searchResultButton:hover {
-  border-color: rgba(16, 55, 111, 0.16);
-  background: linear-gradient(180deg, #ffffff 0%, #eef5ff 100%);
+  border-color: var(--accent-cool);
+  background: #ecf0f1;
 }
 
 .searchResultButton strong {
