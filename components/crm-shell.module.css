@@ -690,6 +690,7 @@
 }
 
 .companyHeader input,
+.companyHeader select,
 .companyGrid input,
 .companyGrid select,
 .partnersBlock input,
@@ -716,6 +717,7 @@
   line-height: 1.2;
   cursor: pointer;
   padding-right: 32px;
+  width: 100%;
 }
 
 .companyHeader select:focus,
