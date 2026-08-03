@@ -79,3 +79,11 @@ input,
 textarea {
   font: inherit;
 }
+
+button {
+  font-weight: 400 !important;
+}
+
+button:hover {
+  font-weight: 600 !important;
+}

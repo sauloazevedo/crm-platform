@@ -16,29 +16,7 @@ export function AuthShell(props: AuthShellProps) {
     <main className={styles.page}>
       <section className={styles.hero}>
         <div className={styles.heroPanel}>
-          <p className={styles.eyebrow}>{props.eyebrow}</p>
-          <h1>{props.title}</h1>
-          <p className={styles.description}>{props.description}</p>
-
-          <div className={styles.highlightCard}>
-            <span>Season Control</span>
-            <strong>Monitor clients, missing docs, payment status, and return workflow in one place.</strong>
-          </div>
-
-          <div className={styles.quickStats}>
-            <article>
-              <strong>184</strong>
-              <span>Returns in progress</span>
-            </article>
-            <article>
-              <strong>29</strong>
-              <span>Clients waiting on documents</span>
-            </article>
-            <article>
-              <strong>12</strong>
-              <span>High-priority follow-ups</span>
-            </article>
-          </div>
+          <img className={styles.logo} src="/smart-tax-returns.png" alt="Smart Tax Returns" />
         </div>
       </section>
 
