@@ -48,10 +48,19 @@ export function DashboardShell() {
         </div>
 
         <nav className={styles.nav}>
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/profile">Profile</Link>
-          <Link href="/leads">Leads</Link>
-          <Link href="/crm">CRM</Link>
+          {tools.map((tool) =>
+            tool.status === "Core module" ? (
+              <Link key={tool.name} href={tool.href} className={styles.navCard}>
+                <strong>{tool.name}</strong>
+                <small>{tool.status}</small>
+              </Link>
+            ) : (
+              <span key={tool.name} className={`${styles.navCard} ${styles.navCardDisabled}`} aria-disabled="true">
+                <strong>{tool.name}</strong>
+                <small>{tool.status}</small>
+              </span>
+            )
+          )}
           <LogoutButton className={styles.logoutButton} />
         </nav>
       </aside>

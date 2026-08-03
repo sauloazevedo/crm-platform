@@ -1209,7 +1209,13 @@
   padding: 18px;
   border-radius: 7px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--surface);
+}
+
+.walletLeadSection .sectionTitleRow h3 {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 1.05rem;
 }
 
 .walletSectionHint,
@@ -1230,8 +1236,8 @@
   gap: 6px;
   padding: 12px;
   border-radius: 7px;
-  border: 1px solid rgba(75, 242, 226, 0.2);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
 }
 
 .walletSummaryGrid span,

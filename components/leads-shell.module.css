@@ -318,8 +318,8 @@
 }
 
 .activeFilterPill {
-  background: rgba(242, 131, 34, 0.12);
-  color: #ffcf98;
+  background: rgba(50, 71, 85, 0.1);
+  color: #324755;
 }
 
 .tagPill {
@@ -343,9 +343,7 @@
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background:
-    radial-gradient(circle at top right, rgba(252, 192, 0, 0.1), transparent 32%),
-    linear-gradient(180deg, #ffffff 0%, #f5f9ff 100%);
+  background: #ffffff;
   box-shadow: var(--shadow);
 }
 
@@ -609,7 +607,7 @@
   padding: 13px 14px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  background: var(--surface);
+  background: #ffffff;
   color: var(--text);
 }
 
