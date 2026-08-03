@@ -7,6 +7,7 @@ import {
   createLeadFile,
   deleteLeadCompany,
   deleteLeadFile,
+  getLeadFiles,
   getLeadFile,
   updateLeadCompany,
   updateLeadFile,
@@ -173,10 +174,23 @@ export function LeadResources({
       return existing;
     }
 
-    const response = await getLeadFile(leadId, fileId);
-    const hydrated = { ...existing, ...response.file };
-    onFilesChange(files.map((item) => (item.id === fileId ? hydrated : item)));
-    return hydrated;
+    try {
+      const response = await getLeadFile(leadId, fileId);
+      const hydrated = { ...existing, ...response.file };
+      onFilesChange(files.map((item) => (item.id === fileId ? hydrated : item)));
+      return hydrated;
+    } catch (error) {
+      // Recover from deployments where the single-file route is unavailable.
+      const response = await getLeadFiles(leadId);
+      const listedFile = response.files.find((item) => item.id === fileId);
+      if (!listedFile?.fileDataBase64) {
+        throw error;
+      }
+
+      const hydrated = { ...existing, ...listedFile };
+      onFilesChange(files.map((item) => (item.id === fileId ? hydrated : item)));
+      return hydrated;
+    }
   }
 
   async function viewFile(fileId: string) {

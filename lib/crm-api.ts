@@ -560,7 +560,7 @@ export async function getLeadFile(leadId: string, fileId: string): Promise<{ fil
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch lead file: ${response.status}`);
+    throw new Error(`Failed to fetch lead file: ${response.status} ${response.statusText}`);
   }
 
   return response.json();
