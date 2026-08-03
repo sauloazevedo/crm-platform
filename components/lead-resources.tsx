@@ -112,6 +112,25 @@ function buildFileDataUrl(file: { contentType?: string | null; fileDataBase64?: 
   return `data:${file.contentType || "application/octet-stream"};base64,${file.fileDataBase64}`;
 }
 
+function buildFileBlobUrl(file: { contentType?: string | null; fileDataBase64?: string }) {
+  if (!file.fileDataBase64) {
+    return null;
+  }
+
+  const byteCharacters = atob(file.fileDataBase64);
+  const byteNumbers = new Array(byteCharacters.length);
+
+  for (let index = 0; index < byteCharacters.length; index += 1) {
+    byteNumbers[index] = byteCharacters.charCodeAt(index);
+  }
+
+  const blob = new Blob([new Uint8Array(byteNumbers)], {
+    type: file.contentType || "application/octet-stream",
+  });
+
+  return URL.createObjectURL(blob);
+}
+
 function removePartnerValue(partners: Record<string, string> | string[] | undefined, partnerIndex: number) {
   return getPartnerValues(partners)
     .filter((_, index) => index !== partnerIndex)
@@ -165,14 +184,15 @@ export function LeadResources({
 
     try {
       const file = await getFileWithData(fileId);
-      const dataUrl = buildFileDataUrl(file);
+      const objectUrl = buildFileBlobUrl(file);
 
-      if (!dataUrl) {
+      if (!objectUrl) {
         setResourceMessage("We could not open this file preview.");
         return;
       }
 
-      window.open(dataUrl, "_blank", "noopener,noreferrer");
+      window.open(objectUrl, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
     } catch (error) {
       console.warn("[LeadResources] failed to preview file:", error);
       setResourceMessage("We could not open this file preview.");
@@ -184,19 +204,22 @@ export function LeadResources({
 
     try {
       const file = await getFileWithData(fileId);
-      const dataUrl = buildFileDataUrl(file);
+      const objectUrl = buildFileBlobUrl(file) ?? buildFileDataUrl(file);
 
-      if (!dataUrl) {
+      if (!objectUrl) {
         setResourceMessage("We could not download this file.");
         return;
       }
 
       const link = document.createElement("a");
-      link.href = dataUrl;
+      link.href = objectUrl;
       link.download = file.originalFileName || file.fileName || "file";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      if (objectUrl.startsWith("blob:")) {
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      }
     } catch (error) {
       console.warn("[LeadResources] failed to download file:", error);
       setResourceMessage("We could not download this file.");
@@ -434,7 +457,7 @@ export function LeadResources({
 
           <div className={styles.companyStack}>
             {companies.map((company) => {
-              const isCollapsed = collapsedCompanies[company.id] ?? true;
+              const isCollapsed = collapsedCompanies[company.id] ?? false;
 
               return (
                 <article key={company.id} className={styles.companyCard}>
@@ -461,6 +484,18 @@ export function LeadResources({
                       }
                       placeholder="Company"
                     />
+                    <select
+                      value={company.entityType ?? ""}
+                      onChange={(event) => updateCompany(company.id, { entityType: event.target.value })}
+                      aria-label="Type of entity"
+                    >
+                      <option value="">Type of entity</option>
+                      {entityTypeOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                     <button type="button" onClick={() => removeCompany(company.id)} aria-label="Delete company">
                       <Trash2 size={18} />
                     </button>
@@ -484,17 +519,6 @@ export function LeadResources({
                             type="date"
                             value={formatDate(company.filingDate)}
                             onChange={(event) => updateCompany(company.id, { filingDate: event.target.value })}
-                          />
-                        </label>
-                        <label>
-                          <span>Company</span>
-                          <input
-                            value={company.companyName}
-                            onChange={(event) => updateCompanyLocally(company.id, { companyName: event.target.value })}
-                            onBlur={(event) =>
-                              void updateCompany(company.id, { companyName: event.target.value.trim() || "New company" })
-                            }
-                            placeholder="Company"
                           />
                         </label>
                         <label className={styles.companyFull}>
@@ -536,18 +560,6 @@ export function LeadResources({
                               <Copy size={17} />
                             </button>
                           </div>
-                        </label>
-                        <label>
-                          <span>Type of Entity</span>
-                          <select
-                            value={company.entityType ?? ""}
-                            onChange={(event) => updateCompany(company.id, { entityType: event.target.value })}
-                          >
-                            <option value="">Select one</option>
-                            {entityTypeOptions.map((option) => (
-                              <option key={option} value={option}>{option}</option>
-                            ))}
-                          </select>
                         </label>
                         <label>
                           <span>Business Type</span>

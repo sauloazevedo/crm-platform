@@ -11,7 +11,7 @@
   border-radius: 7px;
   background: var(--surface);
   box-shadow: var(--shadow);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
 }
 
 .header {
@@ -54,7 +54,7 @@
   min-height: 36px;
   padding: 0 12px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-strong);
   color: var(--text);
   cursor: pointer;
   display: inline-flex;
@@ -112,7 +112,7 @@
   border-radius: 7px;
   background: var(--surface);
   box-shadow: var(--shadow);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
   display: grid;
   gap: 18px;
 }
@@ -682,7 +682,7 @@
 
 .companyHeader {
   display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(180px, 240px) 44px;
   gap: 8px;
   align-items: center;
 }

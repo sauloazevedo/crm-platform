@@ -346,12 +346,12 @@ export function LeadsShell() {
     hasMore: false,
   });
 
-  async function loadLeads(nextOffset = leadsOffset) {
+  async function loadLeads(nextOffset = leadsOffset, nextSearch = searchQuery) {
     setIsLoading(true);
     setMessage(null);
 
     try {
-      const response = await getLeads({ limit: LEADS_PAGE_SIZE, offset: nextOffset, search: searchQuery });
+      const response = await getLeads({ limit: LEADS_PAGE_SIZE, offset: nextOffset, search: nextSearch });
       setLeads(response.leads);
       setLeadsPagination(response.pagination);
       setLeadsOffset(nextOffset);
@@ -381,7 +381,7 @@ export function LeadsShell() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      void loadLeads(0);
+      void loadLeads(0, searchQuery);
     }, 250);
 
     return () => window.clearTimeout(timeoutId);
@@ -1731,6 +1731,53 @@ export function LeadsShell() {
                   ) : null}
                 </div>
               </section>
+              ) : null}
+
+              {selectedLead ? (
+                <section className={crmStyles.intakeSectionStack}>
+                  <h3>Customer acquisition</h3>
+                  <div className={crmStyles.contactGrid}>
+                    <label className={crmStyles.field}>
+                      <span>Type</span>
+                      <input
+                        value={editorForm.customerAcquisitionType ?? ""}
+                        onBlur={() =>
+                          setEditorForm((current) => ({
+                            ...current,
+                            customerAcquisitionType: current.customerAcquisitionType?.trim(),
+                          }))
+                        }
+                        onChange={(event) =>
+                          setEditorForm((current) => ({
+                            ...current,
+                            customerAcquisitionType: event.target.value,
+                          }))
+                        }
+                        placeholder="Referral, Campaign, Walk-in..."
+                      />
+                    </label>
+
+                    <label className={crmStyles.field}>
+                      <span>Source / company</span>
+                      <input
+                        value={editorForm.customerAcquisitionName ?? ""}
+                        onBlur={() =>
+                          setEditorForm((current) => ({
+                            ...current,
+                            customerAcquisitionName: current.customerAcquisitionName?.trim(),
+                          }))
+                        }
+                        onChange={(event) =>
+                          setEditorForm((current) => ({
+                            ...current,
+                            customerAcquisitionName: event.target.value,
+                          }))
+                        }
+                        placeholder="Who sent this client or where they came from"
+                      />
+                    </label>
+                  </div>
+                </section>
               ) : null}
 
               {selectedLead ? (

@@ -364,22 +364,12 @@ export function BoardShell() {
     status: TaskStatus;
     walletItems: WalletDraftItem[];
   } | null>(null);
+  const [draftLeadSearchResults, setDraftLeadSearchResults] = useState<LeadRecord[]>([]);
+  const [editingLeadSearchResults, setEditingLeadSearchResults] = useState<LeadRecord[]>([]);
+  const [leadSourceResults, setLeadSourceResults] = useState<LeadRecord[]>([]);
   const hasPersistedLaneColorsRef = useRef(false);
   const isPersistingBoardRef = useRef(false);
   const queuedBoardRef = useRef<Lane[] | null>(null);
-
-  const leadSourceResults = useMemo(() => {
-    const query = (leadEditorForm.leadSourceName ?? "").trim().toLowerCase();
-
-    if (query.length < 3) {
-      return [];
-    }
-
-    return leads
-      .filter((lead) => lead.id !== selectedLead?.id)
-      .filter((lead) => getFullName(lead).trim().toLowerCase().includes(query))
-      .slice(0, 6);
-  }, [leadEditorForm.leadSourceName, leads, selectedLead?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -413,6 +403,75 @@ export function BoardShell() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const query = (activeTaskModalLaneId ? laneDrafts[activeTaskModalLaneId]?.leadSearch : "").trim();
+
+    if (!query || query.length < 3) {
+      setDraftLeadSearchResults([]);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await getLeads({ limit: 8, search: query });
+          setDraftLeadSearchResults(response.leads);
+        } catch (error) {
+          console.warn("[BoardShell] failed to search leads for draft:", error);
+          setDraftLeadSearchResults([]);
+        }
+      })();
+    }, 220);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeTaskModalLaneId, laneDrafts]);
+
+  useEffect(() => {
+    const query = editingTask?.leadSearch.trim() ?? "";
+
+    if (!query || query.length < 3 || editingTask?.leadId) {
+      setEditingLeadSearchResults([]);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await getLeads({ limit: 8, search: query });
+          setEditingLeadSearchResults(response.leads);
+        } catch (error) {
+          console.warn("[BoardShell] failed to search leads for edit:", error);
+          setEditingLeadSearchResults([]);
+        }
+      })();
+    }, 220);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [editingTask]);
+
+  useEffect(() => {
+    const query = (leadEditorForm.leadSourceName ?? "").trim();
+
+    if (!query || query.length < 3 || leadEditorForm.leadSourceId) {
+      setLeadSourceResults([]);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const response = await getLeads({ limit: 8, search: query });
+          setLeadSourceResults(response.leads.filter((lead) => lead.id !== selectedLead?.id));
+        } catch (error) {
+          console.warn("[BoardShell] failed to search lead source:", error);
+          setLeadSourceResults([]);
+        }
+      })();
+    }, 220);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [leadEditorForm.leadSourceId, leadEditorForm.leadSourceName, selectedLead?.id]);
 
   useEffect(() => {
     if (!hasPersistedLaneColorsRef.current) {
@@ -2194,9 +2253,9 @@ export function BoardShell() {
                       onChange={(event) => updateLaneDraft(activeTaskModalLaneId, "leadSearch", event.target.value)}
                       placeholder="Type at least 6 letters"
                     />
-                    {getLeadSearchResults(laneDrafts[activeTaskModalLaneId]?.leadSearch ?? "").length > 0 ? (
+                    {draftLeadSearchResults.length > 0 ? (
                       <div className={styles.leadSearchResults}>
-                        {getLeadSearchResults(laneDrafts[activeTaskModalLaneId]?.leadSearch ?? "").map((lead) => (
+                        {draftLeadSearchResults.map((lead) => (
                           <button
                             key={lead.id}
                             type="button"
@@ -2208,7 +2267,7 @@ export function BoardShell() {
                         ))}
                       </div>
                     ) : null}
-                    {(laneDrafts[activeTaskModalLaneId]?.leadSearch ?? "").trim().length >= 6 ? (
+                    {(laneDrafts[activeTaskModalLaneId]?.leadSearch ?? "").trim().length >= 3 ? (
                       <small>Select an existing lead from the results.</small>
                     ) : null}
                   </>
@@ -2359,9 +2418,9 @@ export function BoardShell() {
                       }
                       placeholder="Type at least 6 letters"
                     />
-                    {getLeadSearchResults(editingTask.leadSearch).length > 0 ? (
+                    {editingLeadSearchResults.length > 0 ? (
                       <div className={styles.leadSearchResults}>
-                        {getLeadSearchResults(editingTask.leadSearch).map((lead) => (
+                        {editingLeadSearchResults.map((lead) => (
                           <button key={lead.id} type="button" onClick={() => attachLeadToEditing(lead)}>
                             <strong>{getFullName(lead)}</strong>
                             <span>{formatPhoneNumber(lead.phoneNumber)}</span>
@@ -2369,7 +2428,7 @@ export function BoardShell() {
                         ))}
                       </div>
                     ) : null}
-                    {editingTask.leadSearch.trim().length >= 6 ? (
+                    {editingTask.leadSearch.trim().length >= 3 ? (
                       <small>Select an existing lead from the results.</small>
                     ) : null}
                   </>
@@ -2864,6 +2923,51 @@ export function BoardShell() {
                 onFilesChange={setLeadEditorFiles}
                 sections={["companies"]}
               />
+
+              <section className={crmStyles.intakeSectionStack}>
+                <h3>Customer acquisition</h3>
+                <div className={crmStyles.contactGrid}>
+                  <label className={crmStyles.field}>
+                    <span>Type</span>
+                    <input
+                      value={leadEditorForm.customerAcquisitionType ?? ""}
+                      onBlur={() =>
+                        setLeadEditorForm((current) => ({
+                          ...current,
+                          customerAcquisitionType: current.customerAcquisitionType?.trim(),
+                        }))
+                      }
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({
+                          ...current,
+                          customerAcquisitionType: event.target.value,
+                        }))
+                      }
+                      placeholder="Referral, Campaign, Walk-in..."
+                    />
+                  </label>
+
+                  <label className={crmStyles.field}>
+                    <span>Source / company</span>
+                    <input
+                      value={leadEditorForm.customerAcquisitionName ?? ""}
+                      onBlur={() =>
+                        setLeadEditorForm((current) => ({
+                          ...current,
+                          customerAcquisitionName: current.customerAcquisitionName?.trim(),
+                        }))
+                      }
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({
+                          ...current,
+                          customerAcquisitionName: event.target.value,
+                        }))
+                      }
+                      placeholder="Who sent this client or where they came from"
+                    />
+                  </label>
+                </div>
+              </section>
 
               <LeadWalletPanel
                 leadName={getFullName(selectedLead)}
