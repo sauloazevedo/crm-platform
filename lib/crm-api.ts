@@ -368,8 +368,11 @@ export async function getLeads(options?: {
   }
 
   if (options?.search?.trim()) {
-    // `q` is the query parameter used by the currently deployed API.
-    params.set("q", options.search.trim());
+    // Send both names while API deployments are being rolled forward.
+    // Different published stages currently recognize different contracts.
+    const normalizedSearch = options.search.trim();
+    params.set("q", normalizedSearch);
+    params.set("search", normalizedSearch);
   }
 
   const query = params.toString();
