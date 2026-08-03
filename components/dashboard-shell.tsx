@@ -51,7 +51,6 @@ export function DashboardShell() {
           <Link href="/dashboard" className={styles.navLink}>Dashboard</Link>
           <Link href="/profile" className={styles.navLink}>Profile</Link>
           <Link href="/leads" className={styles.navLink}>Leads</Link>
-          <Link href="/crm" className={styles.navLink}>CRM</Link>
           <LogoutButton className={styles.logoutButton} />
         </nav>
       </aside>

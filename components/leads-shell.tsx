@@ -1242,6 +1242,8 @@ export function LeadsShell() {
           <p>Organize sua base por tag, encontre contatos rápido e abra o profile sem sair da listagem.</p>
         </div>
         <div className={styles.headerActions}>
+          <Link href="/dashboard" className={styles.dashboardLink}>Dashboard</Link>
+          <div className={styles.headerTools}>
           <button type="button" className={styles.filterToggle} onClick={() => setIsFilterOpen((current) => !current)}>
             <Filter size={16} strokeWidth={2} aria-hidden="true" />
             Filters
@@ -1249,7 +1251,7 @@ export function LeadsShell() {
           <button type="button" className={styles.filterToggle} onClick={() => setIsImportModalOpen(true)}>
             Import CSV
           </button>
-          <Link href="/dashboard">Back to dashboard</Link>
+          </div>
           <button type="button" className={styles.primaryLinkButton} onClick={openNewLeadModal}>
             New lead
           </button>

@@ -55,7 +55,14 @@
   flex-wrap: wrap;
 }
 
-.headerActions a,
+.headerTools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dashboardLink,
 .filterToggle {
   min-height: 36px;
   display: inline-flex;
@@ -69,6 +76,11 @@
   font-weight: 800;
   font-size: 0.875rem;
   cursor: pointer;
+}
+
+.dashboardLink {
+  background: var(--surface);
+  color: var(--panel);
 }
 
 .filterToggle {

@@ -703,10 +703,12 @@
 }
 
 .companyHeader select {
-  appearance: none;
+  appearance: auto;
   background-color: #ffffff;
   color: var(--text);
   font-weight: 700;
+  font-size: 0.875rem;
+  line-height: 1.2;
   cursor: pointer;
 }
 
