@@ -2125,7 +2125,6 @@ export function BoardShell() {
                       >
                         <>
                             <div className={styles.taskHeader}>
-                              <strong>{task.title}</strong>
                               <div className={styles.taskActions}>
                                 <button type="button" onClick={() => startEditingTask(lane.id, task.id)}>
                                   <Pencil size={12} strokeWidth={2} aria-hidden="true" />
@@ -2137,6 +2136,7 @@ export function BoardShell() {
                                 </button>
                               </div>
                             </div>
+                            <strong className={styles.taskTitle}>{task.title}</strong>
                             {task.notes ? <p className={styles.taskDescriptionCard}>{task.notes}</p> : null}
                             {attachedLeadName ? (
                               <button

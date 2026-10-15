@@ -368,57 +368,80 @@
 }
 
 .taskCard {
+  position: relative;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
   padding: 14px;
   border-radius: 7px;
-  background: rgba(75, 242, 226, 0.08);
-  border: 1px solid rgba(75, 242, 226, 0.24);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dfe8f0;
+  box-shadow: 0 10px 24px rgba(50, 71, 85, 0.08);
+  color: #0b1a35;
+}
+
+.taskCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: #8ed1f5;
 }
 
 .taskHeader {
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: flex-start;
+  justify-content: flex-end;
+  min-height: 36px;
 }
 
-.taskHeader strong {
-  line-height: 1.4;
+.taskTitle {
+  display: block;
+  color: #0b1a35;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  text-transform: uppercase;
 }
 
 .taskActions {
   display: flex;
-  gap: 6px;
+  gap: 10px;
 }
 
 .taskActions button {
-  width: 24px;
-  height: 24px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  min-height: 24px;
-  font-size: 0.7rem;
+  min-height: 36px;
+  border: 1px solid #dfe8f0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.8rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .taskCard p {
-  margin: 12px 0 0;
-  color: var(--muted);
+  margin: -8px 0 0;
+  color: #64748b;
   font-size: 0.86rem;
   line-height: 1.5;
 }
 
 .taskDescriptionCard {
-  padding: 10px;
+  padding: 12px;
   border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid #e7edf3;
+  background: #f8fafc;
 }
 
 .taskStatusControl {
   display: block;
-  margin-top: 12px;
+  margin-top: auto;
   padding: 0;
   border-radius: 7px;
   border: 0;
@@ -437,8 +460,9 @@
   min-width: 0;
   border-radius: 7px;
   border: 0;
-  padding: 8px 9px;
-  font-size: 0.76rem;
+  min-height: 46px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
   font-weight: 800;
   cursor: pointer;
   outline: none;
@@ -978,12 +1002,12 @@
 .attachedLeadCard {
   display: grid;
   width: 100%;
-  margin-top: 12px;
-  padding: 10px;
+  margin-top: -4px;
+  padding: 0;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.035);
-  color: var(--text);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: #0b1a35;
+  border: 0;
   text-align: left;
 }
 
@@ -993,8 +1017,7 @@
 }
 
 .attachedLeadButton:hover {
-  border-color: rgba(75, 242, 226, 0.28);
-  background: rgba(75, 242, 226, 0.075);
+  background: #f5fafc;
   transform: translateY(-1px);
 }
 
@@ -1004,21 +1027,21 @@
 
 .attachedLeadTopline {
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
 }
 
 .leadAvatar {
-  width: 26px;
-  height: 26px;
+  width: 46px;
+  height: 46px;
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(75, 242, 226, 0.24), rgba(242, 131, 34, 0.24));
-  color: var(--text);
-  font-size: 0.58rem;
+  background: #e5f2fd;
+  color: #183b63;
+  font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.04em;
 }
@@ -1033,26 +1056,26 @@
 .attachedLeadTopline div {
   min-width: 0;
   display: grid;
-  gap: 1px;
+  gap: 3px;
 }
 
 .attachedLeadTopline strong {
   overflow: hidden;
-  color: var(--text);
-  font-size: 0.74rem;
-  font-weight: 800;
+  color: #0b1a35;
+  font-size: 0.88rem;
+  font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .attachedLeadTopline small {
-  color: var(--muted);
-  font-size: 0.62rem;
+  color: #7c91ad;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
 .attachedLeadTopline svg {
-  color: rgba(255, 255, 255, 0.44);
+  color: #a3b4c8;
 }
 
 .leadTaskLogStack,
