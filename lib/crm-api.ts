@@ -24,6 +24,11 @@ export type CreateLeadInput = {
   dateOfBirth?: string;
   taxId?: string;
   taxIdLast4?: string;
+  spouseFirstName?: string;
+  spouseLastName?: string;
+  spouseDateOfBirth?: string;
+  spouseTaxId?: string;
+  spouseTaxIdLast4?: string;
   gender?: string;
   situation?: string;
   phoneNumber?: string;
@@ -52,6 +57,11 @@ export type LeadRecord = {
   dateOfBirth?: string | null;
   taxId?: string | null;
   taxIdLast4?: string | null;
+  spouseFirstName?: string | null;
+  spouseLastName?: string | null;
+  spouseDateOfBirth?: string | null;
+  spouseTaxId?: string | null;
+  spouseTaxIdLast4?: string | null;
   gender?: string | null;
   situation?: string | null;
   phoneNumber: string;

@@ -70,6 +70,10 @@ const emptyEditor: UpdateLeadInput = {
   leadPhotoDataUrl: "",
   dateOfBirth: "",
   taxId: "",
+  spouseFirstName: "",
+  spouseLastName: "",
+  spouseDateOfBirth: "",
+  spouseTaxId: "",
   gender: "Male",
   situation: "",
   phoneNumber: "",
@@ -555,6 +559,10 @@ export function LeadsShell() {
       leadPhotoDataUrl: lead.leadPhotoDataUrl ?? "",
       dateOfBirth: lead.dateOfBirth ? String(lead.dateOfBirth).slice(0, 10) : "",
       taxId: lead.taxId ?? "",
+      spouseFirstName: lead.spouseFirstName ?? "",
+      spouseLastName: lead.spouseLastName ?? "",
+      spouseDateOfBirth: lead.spouseDateOfBirth ? String(lead.spouseDateOfBirth).slice(0, 10) : "",
+      spouseTaxId: lead.spouseTaxId ?? "",
       gender: lead.gender ?? "Male",
       situation: lead.situation ?? "",
       phoneNumber: formatPhoneNumber(lead.phoneNumber),
@@ -833,6 +841,10 @@ export function LeadsShell() {
         email: editorForm.email?.trim(),
         address: editorForm.address?.trim(),
         situation: editorForm.situation?.trim(),
+        spouseFirstName: editorForm.spouseFirstName?.trim() || undefined,
+        spouseLastName: editorForm.spouseLastName?.trim() || undefined,
+        spouseDateOfBirth: editorForm.spouseDateOfBirth?.trim() || undefined,
+        spouseTaxId: editorForm.spouseTaxId?.trim() || undefined,
         customerAcquisitionType: editorForm.customerAcquisitionType?.trim() || undefined,
         customerAcquisitionName: editorForm.customerAcquisitionName?.trim() || undefined,
         leadSourceId: editorForm.leadSourceId?.trim() || undefined,
@@ -1589,6 +1601,48 @@ export function LeadsShell() {
                       onBlur={() => setEditorForm((current) => ({ ...current, situation: current.situation?.trim() }))}
                       onChange={(event) => setEditorForm((current) => ({ ...current, situation: event.target.value }))}
                       placeholder="SSN, ITIN, student, NRA..."
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <section className={crmStyles.intakeSectionStack}>
+                <h3>Spouse</h3>
+                <div className={crmStyles.intakeGrid}>
+                  <label className={crmStyles.field}>
+                    <span>First name</span>
+                    <input
+                      value={editorForm.spouseFirstName ?? ""}
+                      onChange={(event) => setEditorForm((current) => ({ ...current, spouseFirstName: event.target.value }))}
+                      placeholder="First name"
+                    />
+                  </label>
+                  <label className={crmStyles.field}>
+                    <span>Last name</span>
+                    <input
+                      value={editorForm.spouseLastName ?? ""}
+                      onChange={(event) => setEditorForm((current) => ({ ...current, spouseLastName: event.target.value }))}
+                      placeholder="Last name"
+                    />
+                  </label>
+                  <label className={crmStyles.field}>
+                    <span>Date of birth</span>
+                    <input
+                      type="date"
+                      value={editorForm.spouseDateOfBirth ?? ""}
+                      onChange={(event) => setEditorForm((current) => ({ ...current, spouseDateOfBirth: event.target.value }))}
+                    />
+                  </label>
+                  <label className={crmStyles.field}>
+                    <span>SSN / ITIN</span>
+                    <input
+                      inputMode="numeric"
+                      maxLength={11}
+                      value={editorForm.spouseTaxId ?? ""}
+                      onChange={(event) =>
+                        setEditorForm((current) => ({ ...current, spouseTaxId: formatTaxId(event.target.value) }))
+                      }
+                      placeholder="xxx-xx-xxxx"
                     />
                   </label>
                 </div>

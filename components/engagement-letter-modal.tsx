@@ -74,7 +74,6 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
   const [entityType, setEntityType] = useState<EntityType>(() => entityFromCompany(companies[0]));
   const [taxYear, setTaxYear] = useState(String(lead.taxYear ?? new Date().getFullYear() - 1));
   const [manager, setManager] = useState<(typeof managers)[number]>(() => managerFromUser(currentUserName));
-  const [spouseName, setSpouseName] = useState("");
 
   const selectedCompany = useMemo(
     () => companies.find((company) => company.id === companyId),
@@ -82,6 +81,7 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
   );
   const isBusinessLetter = companyId !== "individual" && Boolean(selectedCompany);
   const clientName = fullName(lead) || "CLIENT NAME";
+  const spouseName = [lead.spouseFirstName, lead.spouseLastName].filter(Boolean).join(" ").trim();
   const ownerName = partnerNames(selectedCompany)[0] || clientName;
   const engagementName = isBusinessLetter ? selectedCompany?.companyName?.trim() || "BUSINESS NAME" : clientName;
   const date = formatLetterDate(new Date());
@@ -132,17 +132,6 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
                 ))}
               </select>
             </label>
-
-            {!isBusinessLetter ? (
-              <label>
-                <span>Spouse name (optional)</span>
-                <input
-                  value={spouseName}
-                  onChange={(event) => setSpouseName(event.target.value)}
-                  placeholder="Spouse's full name"
-                />
-              </label>
-            ) : null}
 
             <fieldset>
               <legend>Entity type</legend>
@@ -204,7 +193,7 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
 
               <section className={styles.clientInfo}>
                 <h2>Client Information</h2>
-                <p><strong>Client Name:</strong> {clientName}{!isBusinessLetter && spouseName.trim() ? ` and ${spouseName.trim()}` : ""} {isBusinessLetter ? <><strong>Business Name (if applicable):</strong> {engagementName}</> : null}</p>
+                <p><strong>Client Name:</strong> {clientName}{!isBusinessLetter && spouseName ? ` and ${spouseName}` : ""} {isBusinessLetter ? <><strong>Business Name (if applicable):</strong> {engagementName}</> : null}</p>
                 <div className={styles.entityList}>
                   {entityOptions.map((option) => (
                     <span key={option.value}>({entityType === option.value ? "X" : " "}) {option.label}</span>
@@ -260,7 +249,7 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
                   <div>
                     <strong>For Spouse:</strong>
                     <div className={styles.signatureLine} />
-                    <p>{spouseName.trim() || "____________________________"}</p>
+                    <p>{spouseName || "____________________________"}</p>
                     <p>Date: __________</p>
                   </div>
                 ) : null}
