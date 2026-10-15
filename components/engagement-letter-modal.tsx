@@ -55,6 +55,15 @@ function formatLetterDate(date: Date) {
   }).format(date);
 }
 
+function buildPdfFileName(type: "Business" | "Individual", taxYear: string, subjectName: string) {
+  const safeSubjectName = subjectName
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase() || "CLIENT";
+  return `Engagement Letter_${type} Tax ${taxYear || "Year"}_${safeSubjectName}.pdf`;
+}
+
 export function EngagementLetterModal({ lead, companies, currentUserName, onClose }: Props) {
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "individual");
   const [entityType, setEntityType] = useState<EntityType>(() => entityFromCompany(companies[0]));
@@ -69,10 +78,18 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
   const clientName = fullName(lead) || "CLIENT NAME";
   const engagementName = isBusinessLetter ? selectedCompany?.companyName?.trim() || "BUSINESS NAME" : clientName;
   const date = formatLetterDate(new Date());
+  const pdfFileName = buildPdfFileName(isBusinessLetter ? "Business" : "Individual", taxYear, engagementName);
 
   function chooseRecipient(nextCompanyId: string) {
     setCompanyId(nextCompanyId);
     setEntityType(nextCompanyId === "individual" ? "individual" : entityFromCompany(companies.find((company) => company.id === nextCompanyId)));
+  }
+
+  function saveAsPdf() {
+    const originalTitle = document.title;
+    document.title = pdfFileName;
+    window.print();
+    document.title = originalTitle;
   }
 
   return (
@@ -139,6 +156,9 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
             <p className={styles.settingsNote}>The client, company, and entity information are filled from this lead&apos;s CRM record.</p>
             <button type="button" className={styles.printButton} onClick={() => window.print()}>
               <Printer size={18} /> Print engagement letter
+            </button>
+            <button type="button" className={styles.pdfButton} onClick={saveAsPdf}>
+              <Printer size={18} /> Save as PDF
             </button>
           </aside>
 
@@ -207,7 +227,8 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
                 <div>
                   <strong>For {isBusinessLetter ? `${engagementName}:` : "Taxpayer:"}</strong>
                   <div className={styles.signatureLine} />
-                  {isBusinessLetter ? <p>By {clientName}, President &nbsp; Date: __________</p> : <p>{clientName} &nbsp; Date: __________</p>}
+                  {isBusinessLetter ? <p>By {clientName}, President</p> : <p>{clientName}</p>}
+                  <p>Date: __________</p>
                 </div>
                 <div>
                   <strong>For SMART TAX RETURNS LLC:</strong>
