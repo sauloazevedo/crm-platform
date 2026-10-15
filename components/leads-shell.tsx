@@ -36,7 +36,9 @@ import {
 import { LeadResources } from "./lead-resources";
 import { LeadWalletPanel } from "./lead-wallet-panel";
 import { AddressAutocomplete } from "./address-autocomplete";
+import { EngagementLetterModal } from "./engagement-letter-modal";
 import { compressImageFile } from "../lib/image-compression";
+import { useAuth } from "../contexts/AuthContext";
 import boardStyles from "./board-shell.module.css";
 import styles from "./leads-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
@@ -303,12 +305,14 @@ function getTagAccentVar(value?: string | null) {
 }
 
 export function LeadsShell() {
+  const auth = useAuth();
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [searchResults, setSearchResults] = useState<LeadRecord[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
   const searchDirectoryRef = useRef<LeadRecord[] | null>(null);
   const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
+  const [isEngagementLetterOpen, setIsEngagementLetterOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<LeadRecord | null>(null);
   const [editorForm, setEditorForm] = useState<UpdateLeadInput>(emptyEditor);
   const [editorCompanies, setEditorCompanies] = useState<LeadCompanyRecord[]>([]);
@@ -522,6 +526,7 @@ export function LeadsShell() {
   async function openLeadEditor(lead: LeadRecord) {
     setSelectedLead(lead);
     setIsLeadModalOpen(true);
+    setIsEngagementLetterOpen(false);
     setCopyFeedback(null);
     setPhotoFeedback(null);
     setLeadLogMessage(null);
@@ -575,6 +580,7 @@ export function LeadsShell() {
   function openNewLeadModal() {
     setSelectedLead(null);
     setIsLeadModalOpen(true);
+    setIsEngagementLetterOpen(false);
     setCopyFeedback(null);
     setPhotoFeedback(null);
     setLeadLogMessage(null);
@@ -707,6 +713,7 @@ export function LeadsShell() {
   function closeLeadModal() {
     setSelectedLead(null);
     setIsLeadModalOpen(false);
+    setIsEngagementLetterOpen(false);
     setCopyFeedback(null);
     setPhotoFeedback(null);
     setLeadLogMessage(null);
@@ -1501,7 +1508,7 @@ export function LeadsShell() {
                   </div>
 
                   <label className={crmStyles.field}>
-                    <span>Tag</span>
+                    <span>Status</span>
                     <select
                       value={editorForm.source}
                       onChange={(event) => setEditorForm((current) => ({ ...current, source: event.target.value }))}
@@ -1513,6 +1520,19 @@ export function LeadsShell() {
                       ))}
                     </select>
                   </label>
+
+                  {selectedLead ? (
+                    <div className={crmStyles.field}>
+                      <span>Engagement letter</span>
+                      <button
+                        type="button"
+                        className={crmStyles.engagementLetterButton}
+                        onClick={() => setIsEngagementLetterOpen(true)}
+                      >
+                        Prepare engagement letter
+                      </button>
+                    </div>
+                  ) : null}
 
                   <label className={crmStyles.field}>
                     <span>Gender</span>
@@ -1922,6 +1942,15 @@ export function LeadsShell() {
             </form>
           </aside>
         </div>
+      ) : null}
+
+      {isEngagementLetterOpen && selectedLead ? (
+        <EngagementLetterModal
+          lead={selectedLead}
+          companies={editorCompanies}
+          currentUserName={[auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(" ")}
+          onClose={() => setIsEngagementLetterOpen(false)}
+        />
       ) : null}
 
       {isImportModalOpen ? (
