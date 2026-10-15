@@ -445,12 +445,12 @@
 }
 
 .taskStatusInProgress {
-  color: #ffb16e;
+  color: #7d3f0d;
 }
 
 .taskStatusInProgress select {
-  background: rgba(242, 131, 34, 0.22);
-  color: #ffd2a7;
+  background: #fff0e4;
+  color: #7d3f0d;
 }
 
 .taskStatusDone {
@@ -479,9 +479,9 @@
 }
 
 .hideTaskButton:hover {
-  border-color: rgba(242, 131, 34, 0.4);
-  background: rgba(242, 131, 34, 0.12);
-  color: #ffd2a7;
+  border-color: #e8a15d;
+  background: #fff0e4;
+  color: #7d3f0d;
 }
 
 .newTaskComposer,
@@ -1110,8 +1110,8 @@
 .leadTaskLogCard small {
   padding: 6px 8px;
   border-radius: 7px;
-  background: rgba(242, 131, 34, 0.16);
-  color: #ffd2a7;
+  background: #fff0e4;
+  color: #7d3f0d;
 }
 
 .leadTaskEditor {

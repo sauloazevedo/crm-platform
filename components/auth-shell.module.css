@@ -237,9 +237,9 @@
 }
 
 .notice {
-  background: rgba(242, 131, 34, 0.1);
-  border: 1px solid rgba(242, 131, 34, 0.18);
-  color: var(--text);
+  background: #fff0e4;
+  border: 1px solid #e8a15d;
+  color: #7d3f0d;
 }
 
 .errorMessage {
