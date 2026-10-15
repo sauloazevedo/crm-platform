@@ -193,7 +193,8 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
 
               <section className={styles.clientInfo}>
                 <h2>Client Information</h2>
-                <p><strong>Client Name:</strong> {clientName}{!isBusinessLetter && spouseName ? ` and ${spouseName}` : ""} {isBusinessLetter ? <><strong>Business Name (if applicable):</strong> {engagementName}</> : null}</p>
+                <p><strong>Client Name:</strong> {clientName}{!isBusinessLetter && spouseName ? ` and ${spouseName}` : ""}</p>
+                {isBusinessLetter ? <p><strong>Business Name (if applicable):</strong> {engagementName}</p> : null}
                 <div className={styles.entityList}>
                   {entityOptions.map((option) => (
                     <span key={option.value}>({entityType === option.value ? "X" : " "}) {option.label}</span>

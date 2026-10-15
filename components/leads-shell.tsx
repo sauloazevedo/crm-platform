@@ -1568,19 +1568,6 @@ export function LeadsShell() {
                     </select>
                   </label>
 
-                  {selectedLead ? (
-                    <div className={crmStyles.field}>
-                      <span>Engagement letter</span>
-                      <button
-                        type="button"
-                        className={crmStyles.engagementLetterButton}
-                        onClick={() => void openEngagementLetter()}
-                      >
-                        Prepare engagement letter
-                      </button>
-                    </div>
-                  ) : null}
-
                   <label className={crmStyles.field}>
                     <span>Gender</span>
                     <select
@@ -1838,26 +1825,35 @@ export function LeadsShell() {
 
                         {isExpanded ? (
                           <div className={boardStyles.leadTaskEditor}>
-                            <label>
-                              <span>Status</span>
-                              <select
-                                value={draft.status}
-                                onChange={(event) =>
-                                  updateLeadTaskDraft(task.id, {
-                                    status:
-                                      event.target.value === "done"
-                                        ? "done"
-                                        : event.target.value === "todo"
-                                          ? "todo"
-                                          : "in_progress",
-                                  })
-                                }
+                            <div className={boardStyles.leadTaskStatusRow}>
+                              <label>
+                                <span>Status</span>
+                                <select
+                                  value={draft.status}
+                                  onChange={(event) =>
+                                    updateLeadTaskDraft(task.id, {
+                                      status:
+                                        event.target.value === "done"
+                                          ? "done"
+                                          : event.target.value === "todo"
+                                            ? "todo"
+                                            : "in_progress",
+                                    })
+                                  }
+                                >
+                                  <option value="todo">TODO</option>
+                                  <option value="in_progress">In progress</option>
+                                  <option value="done">Done</option>
+                                </select>
+                              </label>
+                              <button
+                                type="button"
+                                className={boardStyles.engagementLetterButton}
+                                onClick={() => void openEngagementLetter()}
                               >
-                                <option value="todo">TODO</option>
-                                <option value="in_progress">In progress</option>
-                                <option value="done">Done</option>
-                              </select>
-                            </label>
+                                Prepare engagement letter
+                              </button>
+                            </div>
                             <label>
                               <span>Description</span>
                               <div className={boardStyles.miniRichEditor}>

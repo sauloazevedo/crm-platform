@@ -473,7 +473,7 @@ export function LeadResources({
 
           <div className={styles.companyStack}>
             {companies.map((company) => {
-              const isCollapsed = collapsedCompanies[company.id] ?? false;
+              const isCollapsed = collapsedCompanies[company.id] ?? true;
 
               return (
                 <article key={company.id} className={styles.companyCard}>
