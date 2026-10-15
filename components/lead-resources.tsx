@@ -259,6 +259,7 @@ export function LeadResources({
     try {
       const response = await createLeadCompany(leadId, draft);
       onCompaniesChange([response.company, ...companies]);
+      setResourceMessage("Company saved and linked to this lead.");
     } catch (error) {
       console.warn("[LeadResources] failed to create company:", error);
       setResourceMessage("We could not create this company yet. Please try again.");
@@ -283,6 +284,7 @@ export function LeadResources({
     try {
       const response = await updateLeadCompany(leadId, companyId, nextCompany);
       onCompaniesChange(nextCompanies.map((company) => (company.id === companyId ? response.company : company)));
+      setResourceMessage("Company changes saved.");
     } catch (error) {
       console.warn("[LeadResources] failed to update company:", error);
       setResourceMessage("We could not save the company update yet.");

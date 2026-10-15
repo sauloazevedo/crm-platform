@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Printer, X } from "lucide-react";
 import type { LeadCompanyRecord, LeadRecord } from "../lib/crm-api";
 import styles from "./engagement-letter-modal.module.css";
@@ -30,6 +30,11 @@ const entityOptions: Array<{ value: EntityType; label: string }> = [
 
 function fullName(lead: LeadRecord) {
   return [lead.firstName, lead.middleName, lead.lastName].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+}
+
+function partnerNames(company?: LeadCompanyRecord) {
+  const partners = company?.partners;
+  return Array.isArray(partners) ? partners.filter(Boolean) : Object.values(partners ?? {}).filter(Boolean);
 }
 
 function entityFromCompany(company?: LeadCompanyRecord): EntityType {
@@ -69,6 +74,7 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
   const [entityType, setEntityType] = useState<EntityType>(() => entityFromCompany(companies[0]));
   const [taxYear, setTaxYear] = useState(String(lead.taxYear ?? new Date().getFullYear() - 1));
   const [manager, setManager] = useState<(typeof managers)[number]>(() => managerFromUser(currentUserName));
+  const [spouseName, setSpouseName] = useState("");
 
   const selectedCompany = useMemo(
     () => companies.find((company) => company.id === companyId),
@@ -76,6 +82,7 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
   );
   const isBusinessLetter = companyId !== "individual" && Boolean(selectedCompany);
   const clientName = fullName(lead) || "CLIENT NAME";
+  const ownerName = partnerNames(selectedCompany)[0] || clientName;
   const engagementName = isBusinessLetter ? selectedCompany?.companyName?.trim() || "BUSINESS NAME" : clientName;
   const date = formatLetterDate(new Date());
   const pdfFileName = buildPdfFileName(isBusinessLetter ? "Business" : "Individual", taxYear, engagementName);
@@ -84,6 +91,13 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
     setCompanyId(nextCompanyId);
     setEntityType(nextCompanyId === "individual" ? "individual" : entityFromCompany(companies.find((company) => company.id === nextCompanyId)));
   }
+
+  useEffect(() => {
+    if (companyId !== "individual" && !companies.some((company) => company.id === companyId)) {
+      setCompanyId("individual");
+      setEntityType("individual");
+    }
+  }, [companies, companyId]);
 
   function saveAsPdf() {
     const originalTitle = document.title;
@@ -118,6 +132,17 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
                 ))}
               </select>
             </label>
+
+            {!isBusinessLetter ? (
+              <label>
+                <span>Spouse name (optional)</span>
+                <input
+                  value={spouseName}
+                  onChange={(event) => setSpouseName(event.target.value)}
+                  placeholder="Spouse's full name"
+                />
+              </label>
+            ) : null}
 
             <fieldset>
               <legend>Entity type</legend>
@@ -179,7 +204,7 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
 
               <section className={styles.clientInfo}>
                 <h2>Client Information</h2>
-                <p><strong>Client Name:</strong> {clientName} {isBusinessLetter ? <><strong>Business Name (if applicable):</strong> {engagementName}</> : null}</p>
+                <p><strong>Client Name:</strong> {clientName}{!isBusinessLetter && spouseName.trim() ? ` and ${spouseName.trim()}` : ""} {isBusinessLetter ? <><strong>Business Name (if applicable):</strong> {engagementName}</> : null}</p>
                 <div className={styles.entityList}>
                   {entityOptions.map((option) => (
                     <span key={option.value}>({entityType === option.value ? "X" : " "}) {option.label}</span>
@@ -228,9 +253,17 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
                 <div>
                   <strong>For {isBusinessLetter ? `${engagementName}:` : "Taxpayer:"}</strong>
                   <div className={styles.signatureLine} />
-                  {isBusinessLetter ? <p>By {clientName}, President</p> : <p>{clientName}</p>}
+                  {isBusinessLetter ? <p>By {ownerName}, Owner</p> : <p>{clientName}</p>}
                   <p>Date: __________</p>
                 </div>
+                {!isBusinessLetter ? (
+                  <div>
+                    <strong>For Spouse:</strong>
+                    <div className={styles.signatureLine} />
+                    <p>{spouseName.trim() || "____________________________"}</p>
+                    <p>Date: __________</p>
+                  </div>
+                ) : null}
                 <div>
                   <strong>For SMART TAX RETURNS LLC:</strong>
                   <div className={styles.signatureLine} />

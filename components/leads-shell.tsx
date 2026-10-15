@@ -219,6 +219,20 @@ function getTaskStatusLabel(status: TaskStatus) {
   return "In progress";
 }
 
+function toCompanyInput(company: LeadCompanyRecord) {
+  return {
+    companyName: company.companyName.trim(),
+    ein: company.ein?.trim() || undefined,
+    filingDate: company.filingDate?.trim() || undefined,
+    principalAddress: company.principalAddress?.trim() || undefined,
+    mailingAddress: company.mailingAddress?.trim() || undefined,
+    entityType: company.entityType?.trim() || undefined,
+    businessType: company.businessType?.trim() || undefined,
+    otherDescription: company.otherDescription?.trim() || undefined,
+    partners: company.partners ?? {},
+  };
+}
+
 function normalizeTaskStatus(status?: string | null): TaskStatus {
   if (status === "done") {
     return "done";
@@ -723,6 +737,22 @@ export function LeadsShell() {
     setEditorInvoices([]);
   }
 
+  async function openEngagementLetter() {
+    if (!selectedLead) {
+      return;
+    }
+
+    setIsEngagementLetterOpen(true);
+
+    try {
+      const response = await getLeadCompanies(selectedLead.id);
+      setEditorCompanies(response.companies);
+    } catch (error) {
+      console.warn("[LeadsShell] failed to refresh companies for engagement letter:", error);
+      setMessage("We could not refresh this lead's companies. Please close and reopen the lead, then try again.");
+    }
+  }
+
   function formatTaxId(value: string) {
     const digits = value.replace(/\D/g, "").slice(0, 9);
     return [digits.slice(0, 3), digits.slice(3, 5), digits.slice(5, 9)].filter(Boolean).join("-");
@@ -813,7 +843,12 @@ export function LeadsShell() {
         const response = await updateLead(selectedLead.id, payload);
         setLeads((current) => current.map((lead) => (lead.id === selectedLead.id ? response.lead : lead)));
       } else {
-        const response = await createLead(payload);
+        const response = await createLead({
+          ...payload,
+          companies: editorCompanies
+            .map(toCompanyInput)
+            .filter((company) => company.companyName && company.companyName !== "New company"),
+        });
         setLeads((current) => [response.lead, ...current]);
       }
 
@@ -1527,7 +1562,7 @@ export function LeadsShell() {
                       <button
                         type="button"
                         className={crmStyles.engagementLetterButton}
-                        onClick={() => setIsEngagementLetterOpen(true)}
+                        onClick={() => void openEngagementLetter()}
                       >
                         Prepare engagement letter
                       </button>

@@ -38,6 +38,7 @@ export type CreateLeadInput = {
   preferredLanguage?: string;
   taxYear?: number;
   notes?: string;
+  companies?: LeadCompanyInput[];
 };
 
 export type UpdateLeadInput = CreateLeadInput;
