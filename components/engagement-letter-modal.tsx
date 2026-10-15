@@ -165,6 +165,7 @@ export function EngagementLetterModal({ lead, companies, currentUserName, onClos
           <div className={styles.previewWrap}>
             <article className={styles.letter}>
               <header className={styles.letterHeader}>
+                <img className={styles.logo} src="/smart-tax-returns.png" alt="Smart Tax Returns" />
                 <h1>ENGAGEMENT LETTER</h1>
                 <p>For Income Tax Preparation Services</p>
               </header>
