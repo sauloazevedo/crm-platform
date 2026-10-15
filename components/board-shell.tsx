@@ -33,7 +33,9 @@ import {
 import { AddressAutocomplete } from "./address-autocomplete";
 import { LeadResources } from "./lead-resources";
 import { LeadWalletPanel } from "./lead-wallet-panel";
+import { EngagementLetterModal } from "./engagement-letter-modal";
 import { compressImageFile } from "../lib/image-compression";
+import { useAuth } from "../contexts/AuthContext";
 import styles from "./board-shell.module.css";
 import crmStyles from "./crm-shell.module.css";
 
@@ -120,6 +122,10 @@ const emptyLeadEditor: UpdateLeadInput = {
   leadPhotoDataUrl: "",
   dateOfBirth: "",
   taxId: "",
+  spouseFirstName: "",
+  spouseLastName: "",
+  spouseDateOfBirth: "",
+  spouseTaxId: "",
   gender: "Male",
   phoneNumber: "",
   email: "",
@@ -331,6 +337,7 @@ function isDoneLaneTitle(title: string) {
 }
 
 export function BoardShell() {
+  const auth = useAuth();
   const [lanes, setLanes] = useState<Lane[]>([]);
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [newLaneTitle, setNewLaneTitle] = useState("");
@@ -341,6 +348,7 @@ export function BoardShell() {
   const [taskSearchStatus, setTaskSearchStatus] = useState<TaskStatusFilter>("all");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [selectedLead, setSelectedLead] = useState<LeadRecord | null>(null);
+  const [engagementLead, setEngagementLead] = useState<LeadRecord | null>(null);
   const [leadEditorForm, setLeadEditorForm] = useState<UpdateLeadInput>(emptyLeadEditor);
   const [leadEditorCompanies, setLeadEditorCompanies] = useState<LeadCompanyRecord[]>([]);
   const [leadEditorFiles, setLeadEditorFiles] = useState<Array<LeadFileRecord & { fileDataBase64?: string }>>([]);
@@ -632,6 +640,10 @@ export function BoardShell() {
       leadPhotoDataUrl: lead.leadPhotoDataUrl ?? "",
       dateOfBirth: lead.dateOfBirth ? String(lead.dateOfBirth).slice(0, 10) : "",
       taxId: lead.taxId ?? "",
+      spouseFirstName: lead.spouseFirstName ?? "",
+      spouseLastName: lead.spouseLastName ?? "",
+      spouseDateOfBirth: lead.spouseDateOfBirth ? String(lead.spouseDateOfBirth).slice(0, 10) : "",
+      spouseTaxId: lead.spouseTaxId ?? "",
       gender: lead.gender ?? "Male",
       phoneNumber: formatPhoneNumber(lead.phoneNumber),
       email: lead.email ?? "",
@@ -662,6 +674,18 @@ export function BoardShell() {
       setLeadEditorFiles([]);
       setLeadEditorLogs([]);
       setLeadEditorInvoices([]);
+    }
+  }
+
+  async function openEngagementLetter(lead: LeadRecord) {
+    setEngagementLead(lead);
+
+    try {
+      const response = await getLeadCompanies(lead.id);
+      setLeadEditorCompanies(response.companies);
+    } catch (error) {
+      console.warn("[BoardShell] failed to refresh companies for engagement letter:", error);
+      setBoardMessage("We could not refresh this lead's companies. Please try again.");
     }
   }
 
@@ -728,6 +752,10 @@ export function BoardShell() {
         phoneNumber: leadEditorForm.phoneNumber?.trim() ?? "",
         email: leadEditorForm.email?.trim(),
         address: leadEditorForm.address?.trim(),
+        spouseFirstName: leadEditorForm.spouseFirstName?.trim() || undefined,
+        spouseLastName: leadEditorForm.spouseLastName?.trim() || undefined,
+        spouseDateOfBirth: leadEditorForm.spouseDateOfBirth?.trim() || undefined,
+        spouseTaxId: leadEditorForm.spouseTaxId?.trim() || undefined,
         leadSourceId: leadEditorForm.leadSourceId?.trim() || undefined,
         leadSourceName: leadEditorForm.leadSourceName?.trim() || undefined,
       });
@@ -2466,31 +2494,47 @@ export function BoardShell() {
               </div>
             </label>
 
-            <label>
-              <span>Status</span>
-              <select
-                value={editingTask.status}
-                onChange={(event) =>
-                  setEditingTask((current) =>
-                    current
-                      ? {
-                          ...current,
-                          status:
-                            event.target.value === "done"
-                              ? "done"
-                              : event.target.value === "todo"
-                                ? "todo"
-                                : "in_progress",
-                        }
-                      : current
-                  )
-                }
-              >
-                <option value="todo">TODO</option>
-                <option value="in_progress">In progress</option>
-                <option value="done">Done</option>
-              </select>
-            </label>
+            <div className={styles.taskStatusActionRow}>
+              <label>
+                <span>Status</span>
+                <select
+                  value={editingTask.status}
+                  onChange={(event) =>
+                    setEditingTask((current) =>
+                      current
+                        ? {
+                            ...current,
+                            status:
+                              event.target.value === "done"
+                                ? "done"
+                                : event.target.value === "todo"
+                                  ? "todo"
+                                  : "in_progress",
+                          }
+                        : current
+                    )
+                  }
+                >
+                  <option value="todo">TODO</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="done">Done</option>
+                </select>
+              </label>
+              {getLeadById(editingTask.leadId) ? (
+                <button
+                  type="button"
+                  className={styles.engagementLetterButton}
+                  onClick={() => {
+                    const lead = getLeadById(editingTask.leadId);
+                    if (lead) {
+                      void openEngagementLetter(lead);
+                    }
+                  }}
+                >
+                  Prepare engagement letter
+                </button>
+              ) : null}
+            </div>
 
             {renderWalletEditor({
               items: editingTask.walletItems,
@@ -2654,6 +2698,54 @@ export function BoardShell() {
                       <option>Other</option>
                       <option>Prefer not to say</option>
                     </select>
+                  </label>
+                </div>
+              </section>
+
+              <section className={crmStyles.intakeSectionStack}>
+                <h3>Spouse</h3>
+                <div className={crmStyles.intakeGrid}>
+                  <label className={crmStyles.field}>
+                    <span>First name</span>
+                    <input
+                      value={leadEditorForm.spouseFirstName ?? ""}
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({ ...current, spouseFirstName: event.target.value }))
+                      }
+                      placeholder="First name"
+                    />
+                  </label>
+                  <label className={crmStyles.field}>
+                    <span>Last name</span>
+                    <input
+                      value={leadEditorForm.spouseLastName ?? ""}
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({ ...current, spouseLastName: event.target.value }))
+                      }
+                      placeholder="Last name"
+                    />
+                  </label>
+                  <label className={crmStyles.field}>
+                    <span>Date of birth</span>
+                    <input
+                      type="date"
+                      value={leadEditorForm.spouseDateOfBirth ?? ""}
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({ ...current, spouseDateOfBirth: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className={crmStyles.field}>
+                    <span>SSN / ITIN</span>
+                    <input
+                      inputMode="numeric"
+                      maxLength={11}
+                      value={leadEditorForm.spouseTaxId ?? ""}
+                      onChange={(event) =>
+                        setLeadEditorForm((current) => ({ ...current, spouseTaxId: formatTaxId(event.target.value) }))
+                      }
+                      placeholder="xxx-xx-xxxx"
+                    />
                   </label>
                 </div>
               </section>
@@ -2885,26 +2977,35 @@ export function BoardShell() {
 
                         {isExpanded ? (
                           <div className={styles.leadTaskEditor}>
-                            <label>
-                              <span>Status</span>
-                              <select
-                                value={draft.status}
-                                onChange={(event) =>
-                                  updateLeadTaskDraft(task.id, {
-                                    status:
-                                      event.target.value === "done"
-                                        ? "done"
-                                        : event.target.value === "todo"
-                                          ? "todo"
-                                          : "in_progress",
-                                  })
-                                }
+                            <div className={styles.leadTaskStatusRow}>
+                              <label>
+                                <span>Status</span>
+                                <select
+                                  value={draft.status}
+                                  onChange={(event) =>
+                                    updateLeadTaskDraft(task.id, {
+                                      status:
+                                        event.target.value === "done"
+                                          ? "done"
+                                          : event.target.value === "todo"
+                                            ? "todo"
+                                            : "in_progress",
+                                    })
+                                  }
+                                >
+                                  <option value="todo">TODO</option>
+                                  <option value="in_progress">In progress</option>
+                                  <option value="done">Done</option>
+                                </select>
+                              </label>
+                              <button
+                                type="button"
+                                className={styles.engagementLetterButton}
+                                onClick={() => void openEngagementLetter(selectedLead)}
                               >
-                                <option value="todo">TODO</option>
-                                <option value="in_progress">In progress</option>
-                                <option value="done">Done</option>
-                              </select>
-                            </label>
+                                Prepare engagement letter
+                              </button>
+                            </div>
                             <label>
                               <span>Description</span>
                               <div className={styles.miniRichEditor}>
@@ -3026,6 +3127,15 @@ export function BoardShell() {
             </form>
           </aside>
         </div>
+      ) : null}
+
+      {engagementLead ? (
+        <EngagementLetterModal
+          lead={engagementLead}
+          companies={leadEditorCompanies}
+          currentUserName={[auth.user?.firstName, auth.user?.lastName].filter(Boolean).join(" ")}
+          onClose={() => setEngagementLead(null)}
+        />
       ) : null}
 
       {activeTaskSearchLaneId ? (

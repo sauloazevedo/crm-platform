@@ -370,8 +370,8 @@
 .taskCard {
   padding: 14px;
   border-radius: 7px;
-  background: var(--surface-muted);
-  border: 1px solid var(--line);
+  background: rgba(75, 242, 226, 0.08);
+  border: 1px solid rgba(75, 242, 226, 0.24);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
@@ -552,6 +552,17 @@
 .taskEditModal label {
   display: grid;
   gap: 8px;
+}
+
+.taskStatusActionRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(220px, 0.55fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.taskStatusActionRow .engagementLetterButton {
+  min-height: 40px;
 }
 
 .taskModal > label + label,
@@ -1535,6 +1546,10 @@
   }
 
   .leadTaskStatusRow {
+    grid-template-columns: 1fr;
+  }
+
+  .taskStatusActionRow {
     grid-template-columns: 1fr;
   }
 
