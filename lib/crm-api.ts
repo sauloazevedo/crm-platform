@@ -210,6 +210,26 @@ export type UpdateCurrentUserProfileInput = {
   lastName: string;
 };
 
+export type CreateBlogPostInput = {
+  slug: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  category?: string;
+  image?: string;
+  readingTime?: string;
+  publishedAt?: string;
+  published?: boolean;
+  relatedServiceSlug?: string;
+  keywords?: string[];
+};
+
+export type BlogPostRecord = CreateBlogPostInput & {
+  createdAt: string;
+  updatedAt: string;
+  publicationStatus: "DRAFT" | "PUBLISHED";
+};
+
 export type InviteWorkspaceUserInput = {
   email: string;
   role?: string;
@@ -411,6 +431,26 @@ export async function createLead(input: CreateLeadInput) {
 
   if (!response.ok) {
     throw new Error(await readApiError(response, `Failed to create lead: ${response.status}`));
+  }
+
+  return response.json();
+}
+
+export async function createBlogPost(input: CreateBlogPostInput): Promise<{ post: BlogPostRecord }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+
+  if (!headers) {
+    throw new Error("Missing authenticated user token.");
+  }
+
+  const response = await fetch(`${getApiBaseUrl()}/blog/posts`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, `Failed to save blog post: ${response.status}`));
   }
 
   return response.json();

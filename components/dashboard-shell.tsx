@@ -30,6 +30,12 @@ const tools = [
     description: "Review office performance, payment status, and bottlenecks.",
     status: "Coming soon",
   },
+  {
+    name: "Smart Blog",
+    href: "/blog",
+    description: "Write, review, and publish articles for Smart Tax Returns.",
+    status: "Publishing",
+  },
 ];
 
 export function DashboardShell() {
@@ -76,7 +82,7 @@ export function DashboardShell() {
               </>
             );
 
-            return tool.status === "Core module" ? (
+            return tool.href !== "/dashboard" ? (
               <Link key={tool.name} href={tool.href} className={styles.toolCard}>{content}</Link>
             ) : (
               <div key={tool.name} className={`${styles.toolCard} ${styles.toolCardDisabled}`} aria-disabled="true">

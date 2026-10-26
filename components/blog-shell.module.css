@@ -1,0 +1,29 @@
+.page { min-height: 100vh; max-width: 1320px; margin: 0 auto; padding: 32px 24px 64px; }
+.header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 28px; }
+.backLink, .websiteLink { display: inline-flex; align-items: center; gap: 7px; font-size: .9rem; color: var(--accent-cool); }
+.eyebrow { margin: 24px 0 8px; color: var(--accent); text-transform: uppercase; letter-spacing: .12em; font-size: .76rem; font-weight: 700; }
+.header h1 { margin: 0; font-size: clamp(2.2rem, 5vw, 3.7rem); }
+.header p:not(.eyebrow) { margin: 10px 0 0; color: var(--muted); max-width: 630px; line-height: 1.55; }
+.websiteLink { margin-top: 8px; border: 1px solid var(--line); border-radius: 7px; padding: 11px 14px; white-space: nowrap; }
+.feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 16px; margin-bottom: 20px; background: color-mix(in srgb, var(--success) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--success) 40%, var(--line)); border-radius: 7px; color: var(--text); }
+.feedback span { color: var(--muted); }
+.editor { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 24px; align-items: start; }
+.mainFields, .sideFields { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; box-shadow: var(--shadow); }
+.mainFields { padding: 26px; display: grid; gap: 20px; }
+.sideFields { padding: 22px; display: grid; gap: 17px; position: sticky; top: 20px; }
+.sideTitle { display: flex; gap: 9px; align-items: center; font-weight: 700; font-size: 1.03rem; }
+.mainFields label, .sideFields label { display: grid; gap: 8px; color: var(--text); font-size: .91rem; font-weight: 650; }
+.mainFields label span { color: var(--accent); }
+.mainFields input, .mainFields textarea, .sideFields input { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 11px 12px; background: var(--surface-strong); color: var(--text); outline: none; font: inherit; font-weight: 400; }
+.mainFields textarea { resize: vertical; line-height: 1.55; }
+.mainFields input:focus, .mainFields textarea:focus, .sideFields input:focus { border-color: var(--accent-cool); box-shadow: 0 0 0 3px rgba(75, 242, 226, .12); }
+.mainFields small, .sideFields small { color: var(--muted); font-size: .76rem; font-weight: 400; }
+.twoColumns { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.contentField { min-height: 420px; }
+.publishToggle { grid-template-columns: 20px 1fr; align-items: start; cursor: pointer; }
+.publishToggle input { width: 17px; height: 17px; margin: 3px 0 0; accent-color: var(--accent); }
+.publishToggle span { display: grid; gap: 3px; }
+.saveButton { display: flex; justify-content: center; align-items: center; gap: 9px; padding: 12px 16px; border: 0; border-radius: 7px; background: var(--accent); color: #06101d; cursor: pointer; }
+.saveButton:disabled { cursor: wait; opacity: .7; }
+@media (max-width: 900px) { .editor { grid-template-columns: 1fr; } .sideFields { position: static; } }
+@media (max-width: 600px) { .page { padding: 22px 16px 48px; } .header { display: grid; } .mainFields { padding: 18px; } .twoColumns { grid-template-columns: 1fr; } }
