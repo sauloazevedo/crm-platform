@@ -18,6 +18,9 @@
 .mainFields textarea { resize: vertical; line-height: 1.55; }
 .mainFields input:focus, .mainFields textarea:focus, .sideFields input:focus { border-color: var(--accent-cool); box-shadow: 0 0 0 3px rgba(75, 242, 226, .12); }
 .mainFields small, .sideFields small { color: var(--muted); font-size: .76rem; font-weight: 400; }
+.sideFields label span { color: var(--accent); }
+.videoPreview { aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #000; }
+.videoPreview iframe { width: 100%; height: 100%; border: 0; display: block; }
 .twoColumns { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .contentField { min-height: 420px; }
 .publishToggle { grid-template-columns: 20px 1fr; align-items: start; cursor: pointer; }

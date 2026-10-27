@@ -215,6 +215,7 @@ export type CreateBlogPostInput = {
   title: string;
   excerpt: string;
   content: string;
+  youtubeEmbedUrl: string;
   category?: string;
   image?: string;
   readingTime?: string;

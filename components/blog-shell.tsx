@@ -16,6 +16,7 @@ type BlogForm = {
   publishedAt: string;
   relatedServiceSlug: string;
   keywords: string;
+  youtubeEmbedUrl: string;
   content: string;
   published: boolean;
 };
@@ -30,6 +31,7 @@ const initialForm: BlogForm = {
   publishedAt: new Date().toISOString().slice(0, 16),
   relatedServiceSlug: "",
   keywords: "",
+  youtubeEmbedUrl: "",
   content: "",
   published: false,
 };
@@ -44,6 +46,35 @@ function slugify(value: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+function toYoutubeEmbedUrl(value: string) {
+  if (!value.trim()) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value.trim());
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, "");
+    let videoId = "";
+
+    if (hostname === "youtu.be") {
+      videoId = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    } else if (hostname === "youtube.com" || hostname === "m.youtube.com") {
+      if (url.pathname === "/watch") {
+        videoId = url.searchParams.get("v") ?? "";
+      } else {
+        const [format, id] = url.pathname.split("/").filter(Boolean);
+        videoId = ["embed", "shorts", "live"].includes(format) ? id ?? "" : "";
+      }
+    }
+
+    return /^[A-Za-z0-9_-]{11}$/.test(videoId)
+      ? `https://www.youtube-nocookie.com/embed/${videoId}`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function BlogShell() {
   const [form, setForm] = useState<BlogForm>(initialForm);
   const [isSaving, setIsSaving] = useState(false);
@@ -55,6 +86,11 @@ export function BlogShell() {
     const headings = form.content.split("\n").filter((line) => /^##\s+/.test(line.trim())).length;
     return { words, headings };
   }, [form.content]);
+
+  const youtubePreviewUrl = useMemo(
+    () => toYoutubeEmbedUrl(form.youtubeEmbedUrl),
+    [form.youtubeEmbedUrl]
+  );
 
   function updateField<Key extends keyof BlogForm>(key: Key, value: BlogForm[Key]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -73,8 +109,13 @@ export function BlogShell() {
     setFeedback(null);
     setCreatedSlug(null);
 
-    if (!form.title.trim() || !form.slug.trim() || !form.excerpt.trim() || !form.content.trim()) {
-      setFeedback("Add a title, slug, excerpt, and article content before saving.");
+    if (!form.title.trim() || !form.slug.trim() || !form.excerpt.trim() || !form.youtubeEmbedUrl.trim() || !form.content.trim()) {
+      setFeedback("Add a title, slug, excerpt, YouTube video, and article content before saving.");
+      return;
+    }
+
+    if (!youtubePreviewUrl) {
+      setFeedback("Use a valid YouTube video URL (youtube.com, youtu.be, Shorts, or an embed URL).");
       return;
     }
 
@@ -91,6 +132,7 @@ export function BlogShell() {
         publishedAt: form.publishedAt ? new Date(form.publishedAt).toISOString() : undefined,
         relatedServiceSlug: form.relatedServiceSlug.trim(),
         keywords: form.keywords.split(",").map((keyword) => keyword.trim()).filter(Boolean),
+        youtubeEmbedUrl: form.youtubeEmbedUrl.trim(),
         content: form.content.trim(),
         published: form.published,
       });
@@ -169,6 +211,16 @@ export function BlogShell() {
             Cover image URL
             <input type="url" value={form.image} onChange={(event) => updateField("image", event.target.value)} placeholder="https://..." />
           </label>
+          <label>
+            YouTube video URL <span>*</span>
+            <input type="url" value={form.youtubeEmbedUrl} onChange={(event) => updateField("youtubeEmbedUrl", event.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
+            <small>Paste a YouTube, Shorts, youtu.be, or existing embed link.</small>
+          </label>
+          {youtubePreviewUrl && (
+            <div className={styles.videoPreview}>
+              <iframe src={youtubePreviewUrl} title="YouTube video preview" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            </div>
+          )}
           <label>
             Publish date
             <input type="datetime-local" value={form.publishedAt} onChange={(event) => updateField("publishedAt", event.target.value)} />
