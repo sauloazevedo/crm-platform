@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, FileText, ImageUp, Send, X } from "lucide-react";
 import { createBlogPost } from "../lib/crm-api";
+import { compressImageFile, isCompressibleImage } from "../lib/image-compression";
 import styles from "./blog-shell.module.css";
 
 type BlogForm = {
@@ -80,6 +81,7 @@ export function BlogShell() {
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [createdSlug, setCreatedSlug] = useState<string | null>(null);
+  const [imageFeedback, setImageFeedback] = useState<string | null>(null);
 
   const contentStats = useMemo(() => {
     const words = form.content.trim() ? form.content.trim().split(/\s+/).length : 0;
@@ -102,6 +104,35 @@ export function BlogShell() {
       title,
       slug: current.slug || slugify(title),
     }));
+  }
+
+  async function uploadCoverImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!isCompressibleImage(file)) {
+      setImageFeedback("Choose a JPG or PNG image.");
+      return;
+    }
+
+    try {
+      setImageFeedback("Compressing image...");
+      const compressed = await compressImageFile(file, {
+        maxBytes: 160_000,
+        maxDimension: 1200,
+        initialQuality: 0.8,
+      });
+
+      updateField("image", compressed.dataUrl);
+      setImageFeedback(`Thumbnail ready (${Math.round(compressed.size / 1024)} KB).`);
+    } catch (error) {
+      console.error("[blog-shell] failed to compress cover image:", error);
+      setImageFeedback("This image could not be compressed enough. Try another JPG or PNG.");
+    }
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -209,8 +240,30 @@ export function BlogShell() {
           <div className={styles.sideTitle}><FileText size={18} /> Publishing details</div>
           <label>
             Cover image URL
-            <input type="url" value={form.image} onChange={(event) => updateField("image", event.target.value)} placeholder="https://..." />
+            <input
+              type="url"
+              value={form.image.startsWith("data:") ? "" : form.image}
+              onChange={(event) => {
+                updateField("image", event.target.value);
+                setImageFeedback(null);
+              }}
+              placeholder="https://..."
+            />
+            <small>Use an external URL or upload a JPG/PNG thumbnail.</small>
           </label>
+          <label className={styles.uploadButton}>
+            <ImageUp size={17} /> Upload thumbnail
+            <input type="file" accept="image/jpeg,image/png" onChange={uploadCoverImage} />
+          </label>
+          {imageFeedback && <small className={styles.imageFeedback}>{imageFeedback}</small>}
+          {form.image && (
+            <div className={styles.coverPreview}>
+              <img src={form.image} alt="Blog cover preview" />
+              <button type="button" onClick={() => { updateField("image", ""); setImageFeedback(null); }} aria-label="Remove cover image">
+                <X size={16} /> Remove
+              </button>
+            </div>
+          )}
           <label>
             YouTube video URL <span>*</span>
             <input type="url" value={form.youtubeEmbedUrl} onChange={(event) => updateField("youtubeEmbedUrl", event.target.value)} placeholder="https://www.youtube.com/watch?v=..." />

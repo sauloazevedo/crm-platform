@@ -19,6 +19,12 @@
 .mainFields input:focus, .mainFields textarea:focus, .sideFields input:focus { border-color: var(--accent-cool); box-shadow: 0 0 0 3px rgba(75, 242, 226, .12); }
 .mainFields small, .sideFields small { color: var(--muted); font-size: .76rem; font-weight: 400; }
 .sideFields label span { color: var(--accent); }
+.uploadButton { display: flex !important; flex-direction: row !important; align-items: center; justify-content: center; gap: 8px; padding: 11px 12px; border: 1px dashed var(--accent-cool); border-radius: 6px; color: var(--accent-cool) !important; cursor: pointer; }
+.uploadButton input { display: none; }
+.imageFeedback { margin-top: -9px; }
+.coverPreview { overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-strong); }
+.coverPreview img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.coverPreview button { width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; padding: 8px; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-size: .8rem; }
 .videoPreview { aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #000; }
 .videoPreview iframe { width: 100%; height: 100%; border: 0; display: block; }
 .twoColumns { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
