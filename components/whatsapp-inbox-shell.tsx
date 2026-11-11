@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bot, CheckCheck, ChevronLeft, CircleAlert, MessageCircle, RefreshCw, Send, UserRound } from "lucide-react";
 import {
@@ -41,9 +41,12 @@ export function WhatsAppInboxShell() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshingRef = useRef(false);
 
-  async function loadConversations(preferredId?: string) {
-    setLoading(true);
+  async function loadConversations(preferredId?: string, silently = false) {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    if (!silently) setLoading(true);
     try {
       const response = await getWhatsAppConversations();
       setConversations(response.conversations);
@@ -60,7 +63,8 @@ export function WhatsAppInboxShell() {
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar as conversas.");
     } finally {
-      setLoading(false);
+      refreshingRef.current = false;
+      if (!silently) setLoading(false);
     }
   }
 
@@ -76,6 +80,15 @@ export function WhatsAppInboxShell() {
   }
 
   useEffect(() => { void loadConversations(); }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadConversations(selected?.id, true);
+      }
+    }, 10_000);
+    return () => window.clearInterval(interval);
+  }, [selected?.id]);
 
   async function updateConversation(action: "claim" | "release" | "resolve") {
     if (!selected) return;
