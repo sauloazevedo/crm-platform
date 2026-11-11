@@ -19,10 +19,10 @@ const tools = [
     status: "Coming soon",
   },
   {
-    name: "Client Messaging",
-    href: "/dashboard",
-    description: "Centralize reminders, outreach, and communication history.",
-    status: "Coming soon",
+    name: "Atendimento",
+    href: "/atendimento",
+    description: "Centralize conversas do WhatsApp, equipe e primeiros atendimentos com IA.",
+    status: "Novo",
   },
   {
     name: "Reports",
@@ -57,6 +57,7 @@ export function DashboardShell() {
           <Link href="/dashboard" className={styles.navLink}>Dashboard</Link>
           <Link href="/profile" className={styles.navLink}>Profile</Link>
           <Link href="/leads" className={styles.navLink}>Leads</Link>
+          <Link href="/atendimento" className={styles.navLink}>Atendimento</Link>
           <LogoutButton className={styles.logoutButton} />
         </nav>
       </aside>
