@@ -743,6 +743,8 @@ export type WhatsAppMessage = {
   bodyText: string | null;
   mediaType: string | null;
   mediaId: string | null;
+  messageType?: "image" | "sticker" | null;
+  mediaCaption?: string | null;
   status: string | null;
   createdAt: string;
 };
@@ -775,6 +777,14 @@ async function whatsappRequest<T>(path: string, init?: RequestInit): Promise<T> 
 
 export function getWhatsAppConversations() {
   return whatsappRequest<{ conversations: WhatsAppConversation[] }>("/whatsapp/conversations");
+}
+
+export async function getWhatsAppMedia(messageId: string) {
+  const headers = await getAuthHeaders({ includeJsonContentType: false });
+  if (!headers) throw new Error("Missing authenticated user token.");
+  const response = await fetch(`${getApiBaseUrl()}/atendimento/whatsapp/media/${encodeURIComponent(messageId)}`, { headers });
+  if (!response.ok) throw new Error(await readApiError(response, "Could not retrieve WhatsApp media."));
+  return response.blob();
 }
 
 export function getWhatsAppConversation(id: string) {

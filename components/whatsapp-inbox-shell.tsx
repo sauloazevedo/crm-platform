@@ -7,6 +7,7 @@ import {
   claimWhatsAppConversation,
   getWhatsAppConversation,
   getWhatsAppConversations,
+  getWhatsAppMedia,
   releaseWhatsAppConversationToAi,
   resolveWhatsAppConversation,
   sendWhatsAppMessage,
@@ -31,6 +32,31 @@ function formatTime(value: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function WhatsAppMedia({ message }: { message: WhatsAppMessage }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+
+  useEffect(() => {
+    if (message.messageType !== "image" && message.messageType !== "sticker") return;
+    let objectUrl: string | null = null;
+    let active = true;
+    void getWhatsAppMedia(message.id)
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        if (active) setSrc(objectUrl);
+      })
+      .catch(() => { if (active) setUnavailable(true); });
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [message.id, message.messageType]);
+
+  if (unavailable) return <p>[imagem indisponível]</p>;
+  if (!src) return <p>Carregando mídia…</p>;
+  return <><img src={src} alt={message.mediaCaption || "Mídia recebida no WhatsApp"} /><p>{message.mediaCaption || null}</p></>;
 }
 
 export function WhatsAppInboxShell() {
@@ -172,7 +198,9 @@ export function WhatsAppInboxShell() {
               {messages.map((message) => <div key={message.id} className={`${styles.row} ${message.direction === "outbound" ? styles.outbound : ""}`}>
                 <article className={styles.message}>
                   {message.senderType === "app" ? <small>Enviada pelo App do celular</small> : null}
-                  <p>{message.bodyText || `[${message.mediaType || "Mensagem"}]`}</p>
+                  {message.messageType === "image" || message.messageType === "sticker"
+                    ? <WhatsAppMedia message={message} />
+                    : <p>{message.bodyText || `[${message.mediaType || "Mensagem"}]`}</p>}
                   <span>{formatTime(message.createdAt)} {message.direction === "outbound" ? <CheckCheck size={13} /> : null}</span>
                 </article>
               </div>)}
