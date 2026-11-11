@@ -279,7 +279,7 @@ export function CrmShell() {
 
           <div className={styles.actions}>
             <Link href="/dashboard">Dashboard</Link>
-            <Link href="/atendimento">Atendimento</Link>
+            <Link href="/atendimento/whatsapp">Atendimento</Link>
             <Link href="/crm/tasks" className={styles.toolsButton}>
               Tasks
             </Link>

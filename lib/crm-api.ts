@@ -735,6 +735,71 @@ export async function deleteLeadLog(leadId: string, logId: string): Promise<{ id
   return response.json();
 }
 
+export type WhatsAppMessage = {
+  id: string;
+  whatsappMessageId: string;
+  direction: "inbound" | "outbound";
+  senderType: "customer" | "ai" | "human" | "app";
+  bodyText: string | null;
+  mediaType: string | null;
+  mediaId: string | null;
+  status: string | null;
+  createdAt: string;
+};
+
+export type WhatsAppConversation = {
+  id: string;
+  status: "open" | "pending_ai" | "pending_human" | "resolved";
+  assignedTo: string | null;
+  assignedName: string | null;
+  lockedBy: "ai" | "human" | "app" | null;
+  lockedAt: string | null;
+  lastMessageAt: string | null;
+  contact: {
+    id: string;
+    waId: string;
+    name: string;
+    phone: string;
+  };
+  lastMessage: string | null;
+};
+
+async function whatsappRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+  if (!headers) throw new Error("Missing authenticated user token.");
+
+  const response = await fetch(`${getApiBaseUrl()}${path}`, { ...init, headers: { ...headers, ...init?.headers } });
+  if (!response.ok) throw new Error(await readApiError(response, `WhatsApp request failed: ${response.status}`));
+  return response.json() as Promise<T>;
+}
+
+export function getWhatsAppConversations() {
+  return whatsappRequest<{ conversations: WhatsAppConversation[] }>("/whatsapp/conversations");
+}
+
+export function getWhatsAppConversation(id: string) {
+  return whatsappRequest<{ conversation: WhatsAppConversation; messages: WhatsAppMessage[] }>(`/whatsapp/conversations/${id}`);
+}
+
+export function sendWhatsAppMessage(id: string, body: string) {
+  return whatsappRequest<{ message: WhatsAppMessage }>(`/whatsapp/conversations/${id}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+}
+
+export function claimWhatsAppConversation(id: string) {
+  return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/claim`, { method: "POST" });
+}
+
+export function releaseWhatsAppConversationToAi(id: string) {
+  return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/release-ai`, { method: "POST" });
+}
+
+export function resolveWhatsAppConversation(id: string) {
+  return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/resolve`, { method: "POST" });
+}
+
 export async function getLeadInvoices(leadId: string): Promise<{ invoices: LeadInvoiceRecord[] }> {
   const headers = await getAuthHeaders({ includeJsonContentType: true });
 

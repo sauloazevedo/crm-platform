@@ -20,7 +20,7 @@ const tools = [
   },
   {
     name: "Atendimento",
-    href: "/atendimento",
+    href: "/atendimento/whatsapp",
     description: "Centralize conversas do WhatsApp, equipe e primeiros atendimentos com IA.",
     status: "Novo",
   },
@@ -57,7 +57,7 @@ export function DashboardShell() {
           <Link href="/dashboard" className={styles.navLink}>Dashboard</Link>
           <Link href="/profile" className={styles.navLink}>Profile</Link>
           <Link href="/leads" className={styles.navLink}>Leads</Link>
-          <Link href="/atendimento" className={styles.navLink}>Atendimento</Link>
+          <Link href="/atendimento/whatsapp" className={styles.navLink}>Atendimento</Link>
           <LogoutButton className={styles.logoutButton} />
         </nav>
       </aside>
