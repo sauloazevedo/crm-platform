@@ -40,17 +40,14 @@ function WhatsAppMedia({ message }: { message: WhatsAppMessage }) {
 
   useEffect(() => {
     if (message.messageType !== "image" && message.messageType !== "sticker") return;
-    let objectUrl: string | null = null;
     let active = true;
     void getWhatsAppMedia(message.id)
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
-        if (active) setSrc(objectUrl);
+      .then((url) => {
+        if (active) setSrc(url);
       })
       .catch(() => { if (active) setUnavailable(true); });
     return () => {
       active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [message.id, message.messageType]);
 
