@@ -61,6 +61,11 @@ export function WhatsAppInboxShell() {
     document.addEventListener("click", handlePanelClose);
     return () => document.removeEventListener("click", handlePanelClose);
   }, []);
+  useEffect(() => {
+    document.querySelectorAll<HTMLButtonElement>("button[aria-label]").forEach((button) => {
+      if (!button.title) button.title = button.getAttribute("aria-label") || "Ação";
+    });
+  }, []);
 
   async function updateConversation(action: "claim" | "release" | "resolve" | "priority" | "star" | "archive") { if (!selected) return; setWorking(true); try { const response = action === "claim" ? await claimWhatsAppConversation(selected.id) : action === "release" ? await releaseWhatsAppConversationToAi(selected.id) : action === "resolve" ? await resolveWhatsAppConversation(selected.id) : action === "priority" ? await toggleWhatsAppConversationPriority(selected.id) : action === "star" ? await toggleWhatsAppConversationStar(selected.id) : await toggleWhatsAppConversationArchive(selected.id); setSelected(response.conversation); setConversations((current) => current.map((conversation) => conversation.id === response.conversation.id ? response.conversation : conversation)); setError(null); if (action === "archive") await loadConversations(); } catch (actionError) { setError(actionError instanceof Error ? actionError.message : "Não foi possível atualizar a conversa."); } finally { setWorking(false); } }
   async function removeConversation() { if (!selected || !window.confirm("Excluir esta conversa e todo o histórico? Esta ação não pode ser desfeita.")) return; setWorking(true); try { await deleteWhatsAppConversation(selected.id); setSelected(null); setMessages([]); await loadConversations(); } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "Não foi possível excluir a conversa."); } finally { setWorking(false); } }
