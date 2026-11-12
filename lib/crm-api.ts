@@ -790,7 +790,7 @@ export function waitWhatsAppConversationUpdates(since: string | null) {
 export async function getWhatsAppMedia(messageId: string) {
   const headers = await getAuthHeaders({ includeJsonContentType: false });
   if (!headers) throw new Error("Missing authenticated user token.");
-  const response = await fetch(`${getApiBaseUrl()}/atendimento/whatsapp/media/${encodeURIComponent(messageId)}`, { headers: { ...headers, Accept: "application/json" } });
+  const response = await fetch(`${getApiBaseUrl()}/atendimento/whatsapp/media/${encodeURIComponent(messageId)}?format=json`, { headers: { ...headers, Accept: "application/json" } });
   if (!response.ok) throw new Error(await readApiError(response, "Could not retrieve WhatsApp media."));
   const payload = await response.json() as { url?: string };
   if (!payload.url) throw new Error("WhatsApp media URL was not returned.");
