@@ -51,8 +51,11 @@ function WhatsAppMedia({ message }: { message: WhatsAppMessage }) {
     };
   }, [message.id, message.messageType]);
 
-  if (unavailable) return <p>[imagem indisponível]</p>;
+  if (unavailable) return <p>[mídia indisponível]</p>;
   if (!src) return <p>Carregando mídia…</p>;
+  if (message.messageType === "video") return <><video src={src} controls preload="metadata" /><p>{message.mediaCaption || null}</p></>;
+  if (message.messageType === "audio") return <><audio src={src} controls preload="metadata" /><p>{message.mediaCaption || null}</p></>;
+  if (message.messageType === "document") return <p><a href={src} target="_blank" rel="noreferrer">Abrir documento</a>{message.mediaCaption ? ` — ${message.mediaCaption}` : ""}</p>;
   return <><img src={src} alt={message.mediaCaption || "Mídia recebida no WhatsApp"} /><p>{message.mediaCaption || null}</p></>;
 }
 
@@ -195,7 +198,7 @@ export function WhatsAppInboxShell() {
               {messages.map((message) => <div key={message.id} className={`${styles.row} ${message.direction === "outbound" ? styles.outbound : ""}`}>
                 <article className={styles.message}>
                   {message.senderType === "app" ? <small>Enviada pelo App do celular</small> : null}
-                  {message.messageType === "image" || message.messageType === "sticker"
+                  {message.messageType === "image" || message.messageType === "sticker" || message.messageType === "video" || message.messageType === "audio" || message.messageType === "document"
                     ? <WhatsAppMedia message={message} />
                     : <p>{message.bodyText || `[${message.mediaType || "Mensagem"}]`}</p>}
                   <span>{formatTime(message.createdAt)} {message.direction === "outbound" ? <CheckCheck size={13} /> : null}</span>

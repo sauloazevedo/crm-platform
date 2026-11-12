@@ -743,7 +743,7 @@ export type WhatsAppMessage = {
   bodyText: string | null;
   mediaType: string | null;
   mediaId: string | null;
-  messageType?: "image" | "sticker" | null;
+  messageType?: "image" | "sticker" | "video" | "audio" | "document" | null;
   mediaCaption?: string | null;
   status: string | null;
   createdAt: string;
