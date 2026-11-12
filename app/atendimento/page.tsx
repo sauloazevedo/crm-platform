@@ -1,10 +1,5 @@
-import { AuthGuard } from "../../components/auth/auth-guard";
-import { AtendimentoShell } from "../../components/atendimento-shell";
+import { redirect } from "next/navigation";
 
 export default function AtendimentoPage() {
-  return (
-    <AuthGuard>
-      <AtendimentoShell />
-    </AuthGuard>
-  );
+  redirect("/atendimento/whatsapp");
 }
