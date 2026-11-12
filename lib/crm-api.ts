@@ -811,22 +811,24 @@ export function sendWhatsAppMessage(id: string, body: string) {
 export type WhatsAppOutgoingMedia = {
   objectKey: string;
   mimeType: string;
-  messageType: "image" | "video" | "audio" | "document";
+  messageType: "image" | "sticker" | "video" | "audio" | "document";
+  size?: number;
   caption?: string;
 };
 
-export async function createWhatsAppMediaUpload(id: string, file: File) {
+export async function createWhatsAppMediaUpload(id: string, file: File, messageType?: WhatsAppOutgoingMedia["messageType"]) {
+  const mimeType = file.type.toLowerCase().split(";", 1)[0].trim();
   const response = await whatsappRequest<{ uploadUrl: string; objectKey: string; expiresIn: number }>(`/whatsapp/conversations/${id}/media-upload`, {
     method: "POST",
-    body: JSON.stringify({ media: { mimeType: file.type, size: file.size } }),
+    body: JSON.stringify({ media: { mimeType, size: file.size, messageType } }),
   });
   const upload = await fetch(response.uploadUrl, {
     method: "PUT",
-    headers: { "Content-Type": file.type },
+    headers: { "Content-Type": mimeType },
     body: file,
   });
-  if (!upload.ok) throw new Error("Não foi possível enviar o arquivo para o armazenamento seguro.");
-  return { objectKey: response.objectKey, mimeType: file.type };
+  if (!upload.ok) throw new Error(`Não foi possível enviar o arquivo para o armazenamento seguro (HTTP ${upload.status}). Verifique o formato e tente novamente.`);
+  return { objectKey: response.objectKey, mimeType, size: file.size };
 }
 
 export function sendWhatsAppMedia(id: string, media: WhatsAppOutgoingMedia) {
