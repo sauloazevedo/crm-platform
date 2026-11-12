@@ -756,6 +756,9 @@ export type WhatsAppConversation = {
   assignedName: string | null;
   lockedBy: "ai" | "human" | "app" | null;
   lockedAt: string | null;
+  isPriority: boolean;
+  isStarred: boolean;
+  archivedAt: string | null;
   lastMessageAt: string | null;
   contact: {
     id: string;
@@ -838,6 +841,22 @@ export function releaseWhatsAppConversationToAi(id: string) {
 
 export function resolveWhatsAppConversation(id: string) {
   return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/resolve`, { method: "POST" });
+}
+
+export function toggleWhatsAppConversationPriority(id: string) {
+  return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/priority`, { method: "POST" });
+}
+
+export function toggleWhatsAppConversationStar(id: string) {
+  return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/star`, { method: "POST" });
+}
+
+export function toggleWhatsAppConversationArchive(id: string) {
+  return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/archive`, { method: "POST" });
+}
+
+export function deleteWhatsAppConversation(id: string) {
+  return whatsappRequest<{ deleted: boolean; conversationId: string }>(`/whatsapp/conversations/${id}`, { method: "DELETE" });
 }
 
 export async function getLeadInvoices(leadId: string): Promise<{ invoices: LeadInvoiceRecord[] }> {
