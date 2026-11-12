@@ -800,6 +800,34 @@ export function sendWhatsAppMessage(id: string, body: string) {
   });
 }
 
+export type WhatsAppOutgoingMedia = {
+  objectKey: string;
+  mimeType: string;
+  messageType: "image" | "video" | "audio" | "document";
+  caption?: string;
+};
+
+export async function createWhatsAppMediaUpload(id: string, file: File) {
+  const response = await whatsappRequest<{ uploadUrl: string; objectKey: string; expiresIn: number }>(`/whatsapp/conversations/${id}/media-upload`, {
+    method: "POST",
+    body: JSON.stringify({ media: { mimeType: file.type, size: file.size } }),
+  });
+  const upload = await fetch(response.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!upload.ok) throw new Error("Não foi possível enviar o arquivo para o armazenamento seguro.");
+  return { objectKey: response.objectKey, mimeType: file.type };
+}
+
+export function sendWhatsAppMedia(id: string, media: WhatsAppOutgoingMedia) {
+  return whatsappRequest<{ message: WhatsAppMessage }>(`/whatsapp/conversations/${id}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ media }),
+  });
+}
+
 export function claimWhatsAppConversation(id: string) {
   return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/claim`, { method: "POST" });
 }

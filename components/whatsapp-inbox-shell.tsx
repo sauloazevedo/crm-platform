@@ -2,230 +2,52 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bot, CheckCheck, ChevronLeft, CircleAlert, MessageCircle, RefreshCw, Send, UserRound } from "lucide-react";
-import {
-  claimWhatsAppConversation,
-  getWhatsAppConversation,
-  getWhatsAppConversations,
-  getWhatsAppMedia,
-  releaseWhatsAppConversationToAi,
-  resolveWhatsAppConversation,
-  sendWhatsAppMessage,
-  type WhatsAppConversation,
-  type WhatsAppMessage,
-} from "../lib/crm-api";
+import { Archive, Bot, Check, CheckCheck, ChevronLeft, CircleAlert, FileText, ImagePlus, LoaderCircle, MessageCircle, MoreHorizontal, Paperclip, Phone, RefreshCw, Search, Send, Smile, Star, Tag, Trash2, UserRound, Volume2, X } from "lucide-react";
+import { claimWhatsAppConversation, createWhatsAppMediaUpload, getWhatsAppConversation, getWhatsAppConversations, getWhatsAppMedia, releaseWhatsAppConversationToAi, resolveWhatsAppConversation, sendWhatsAppMedia, sendWhatsAppMessage, type WhatsAppConversation, type WhatsAppMessage } from "../lib/crm-api";
 import styles from "./whatsapp-inbox-shell.module.css";
 
-const statusLabel: Record<WhatsAppConversation["status"], string> = {
-  open: "Em atendimento",
-  pending_ai: "IA disponível",
-  pending_human: "Aguardando equipe",
-  resolved: "Resolvida",
-};
+const statusLabel: Record<WhatsAppConversation["status"], string> = { open: "Em atendimento", pending_ai: "IA disponível", pending_human: "Aguardando equipe", resolved: "Resolvida" };
 
-function initials(name: string) {
-  return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "WA";
-}
-
-function formatTime(value: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
-}
+function initials(name: string) { return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "WA"; }
+function formatTime(value: string | null) { if (!value) return ""; const date = new Date(value); return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date); }
+function mediaTypeFor(file: File): "image" | "video" | "audio" | "document" { if (file.type.startsWith("image/")) return "image"; if (file.type.startsWith("video/")) return "video"; if (file.type.startsWith("audio/")) return "audio"; return "document"; }
 
 function WhatsAppMedia({ message }: { message: WhatsAppMessage }) {
-  const [src, setSrc] = useState<string | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
-
-  useEffect(() => {
-    if (message.messageType !== "image" && message.messageType !== "sticker") return;
-    let active = true;
-    void getWhatsAppMedia(message.id)
-      .then((url) => {
-        if (active) setSrc(url);
-      })
-      .catch(() => { if (active) setUnavailable(true); });
-    return () => {
-      active = false;
-    };
-  }, [message.id, message.messageType]);
-
-  if (unavailable) return <p>[mídia indisponível]</p>;
-  if (!src) return <p>Carregando mídia…</p>;
+  const [src, setSrc] = useState<string | null>(null); const [unavailable, setUnavailable] = useState(false);
+  useEffect(() => { if (!message.messageType) return; let active = true; void getWhatsAppMedia(message.id).then((url) => { if (active) setSrc(url); }).catch(() => { if (active) setUnavailable(true); }); return () => { active = false; }; }, [message.id, message.messageType]);
+  if (unavailable) return <p className={styles.mediaUnavailable}>[mídia indisponível]</p>;
+  if (!src) return <p className={styles.mediaLoading}>Carregando mídia…</p>;
   if (message.messageType === "video") return <><video src={src} controls preload="metadata" /><p>{message.mediaCaption || null}</p></>;
   if (message.messageType === "audio") return <><audio src={src} controls preload="metadata" /><p>{message.mediaCaption || null}</p></>;
-  if (message.messageType === "document") return <p><a href={src} target="_blank" rel="noreferrer">Abrir documento</a>{message.mediaCaption ? ` — ${message.mediaCaption}` : ""}</p>;
+  if (message.messageType === "document") return <p className={styles.documentMessage}><FileText size={18} /><a href={src} target="_blank" rel="noreferrer">Abrir documento</a>{message.mediaCaption ? ` — ${message.mediaCaption}` : ""}</p>;
   return <><img src={src} alt={message.mediaCaption || "Mídia recebida no WhatsApp"} /><p>{message.mediaCaption || null}</p></>;
 }
 
 export function WhatsAppInboxShell() {
-  const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
-  const [selected, setSelected] = useState<WhatsAppConversation | null>(null);
-  const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
-  const [draft, setDraft] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const refreshingRef = useRef(false);
+  const [conversations, setConversations] = useState<WhatsAppConversation[]>([]); const [selected, setSelected] = useState<WhatsAppConversation | null>(null); const [messages, setMessages] = useState<WhatsAppMessage[]>([]); const [draft, setDraft] = useState(""); const [search, setSearch] = useState(""); const [attachment, setAttachment] = useState<File | null>(null); const [loading, setLoading] = useState(true); const [working, setWorking] = useState(false); const [recording, setRecording] = useState(false); const [error, setError] = useState<string | null>(null);
+  const refreshingRef = useRef(false); const fileInputRef = useRef<HTMLInputElement>(null); const mediaRecorderRef = useRef<MediaRecorder | null>(null); const recordingChunksRef = useRef<Blob[]>([]);
 
   async function loadConversations(preferredId?: string, silently = false) {
-    if (refreshingRef.current) return;
-    refreshingRef.current = true;
-    if (!silently) setLoading(true);
-    try {
-      const response = await getWhatsAppConversations();
-      setConversations(response.conversations);
-      const next = response.conversations.find((conversation) => conversation.id === preferredId)
-        ?? response.conversations.find((conversation) => conversation.id === selected?.id)
-        ?? response.conversations[0]
-        ?? null;
-      if (next) await selectConversation(next);
-      else {
-        setSelected(null);
-        setMessages([]);
-      }
-      setError(null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar as conversas.");
-    } finally {
-      refreshingRef.current = false;
-      if (!silently) setLoading(false);
-    }
+    if (refreshingRef.current) return; refreshingRef.current = true; if (!silently) setLoading(true);
+    try { const response = await getWhatsAppConversations(); setConversations(response.conversations); const next = response.conversations.find((conversation) => conversation.id === preferredId) ?? response.conversations.find((conversation) => conversation.id === selected?.id) ?? response.conversations[0] ?? null; if (next) await selectConversation(next); else { setSelected(null); setMessages([]); } setError(null); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar as conversas."); } finally { refreshingRef.current = false; if (!silently) setLoading(false); }
   }
-
-  async function selectConversation(conversation: WhatsAppConversation) {
-    setSelected(conversation);
-    try {
-      const response = await getWhatsAppConversation(conversation.id);
-      setSelected(response.conversation);
-      setMessages(response.messages);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar a conversa.");
-    }
-  }
-
+  async function selectConversation(conversation: WhatsAppConversation) { setSelected(conversation); try { const response = await getWhatsAppConversation(conversation.id); setSelected(response.conversation); setMessages(response.messages); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar a conversa."); } }
   useEffect(() => { void loadConversations(); }, []);
+  useEffect(() => { const interval = window.setInterval(() => { if (document.visibilityState === "visible") void loadConversations(selected?.id, true); }, 10_000); return () => window.clearInterval(interval); }, [selected?.id]);
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadConversations(selected?.id, true);
-      }
-    }, 10_000);
-    return () => window.clearInterval(interval);
-  }, [selected?.id]);
+  async function updateConversation(action: "claim" | "release" | "resolve") { if (!selected) return; setWorking(true); try { const response = action === "claim" ? await claimWhatsAppConversation(selected.id) : action === "release" ? await releaseWhatsAppConversationToAi(selected.id) : await resolveWhatsAppConversation(selected.id); setSelected(response.conversation); setConversations((current) => current.map((conversation) => conversation.id === response.conversation.id ? response.conversation : conversation)); setError(null); } catch (actionError) { setError(actionError instanceof Error ? actionError.message : "Não foi possível atualizar a conversa."); } finally { setWorking(false); } }
+  function chooseFile(file: File | undefined) { if (!file) return; if (file.size > 32 * 1024 * 1024) { setError("O arquivo precisa ter no máximo 32 MB."); return; } setAttachment(file); setError(null); }
+  async function send(event: React.FormEvent) { event.preventDefault(); if (!selected || (!draft.trim() && !attachment)) return; setWorking(true); try { if (attachment) { const uploaded = await createWhatsAppMediaUpload(selected.id, attachment); const response = await sendWhatsAppMedia(selected.id, { ...uploaded, messageType: mediaTypeFor(attachment), caption: draft.trim() || undefined }); setMessages((current) => [...current, response.message]); setAttachment(null); setDraft(""); } else { const response = await sendWhatsAppMessage(selected.id, draft.trim()); setMessages((current) => [...current, response.message]); setDraft(""); } await loadConversations(selected.id); } catch (sendError) { setError(sendError instanceof Error ? sendError.message : "Não foi possível enviar a mensagem."); } finally { setWorking(false); } }
+  async function toggleRecording() { if (recording && mediaRecorderRef.current) { mediaRecorderRef.current.stop(); setRecording(false); return; } try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const preferredType = MediaRecorder.isTypeSupported("audio/ogg;codecs=opus") ? "audio/ogg;codecs=opus" : "audio/webm"; const recorder = new MediaRecorder(stream, { mimeType: preferredType }); recordingChunksRef.current = []; recorder.ondataavailable = (event) => recordingChunksRef.current.push(event.data); recorder.onstop = () => { stream.getTracks().forEach((track) => track.stop()); const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || preferredType }); const extension = blob.type.includes("ogg") ? "ogg" : "webm"; setAttachment(new File([blob], `mensagem-${Date.now()}.${extension}`, { type: blob.type })); }; mediaRecorderRef.current = recorder; recorder.start(); setRecording(true); } catch { setError("Não foi possível acessar o microfone neste navegador."); } }
 
-  async function updateConversation(action: "claim" | "release" | "resolve") {
-    if (!selected) return;
-    setWorking(true);
-    try {
-      const response = action === "claim"
-        ? await claimWhatsAppConversation(selected.id)
-        : action === "release"
-          ? await releaseWhatsAppConversationToAi(selected.id)
-          : await resolveWhatsAppConversation(selected.id);
-      setSelected(response.conversation);
-      setConversations((current) => current.map((conversation) => conversation.id === response.conversation.id ? response.conversation : conversation));
-      setError(null);
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Não foi possível atualizar a conversa.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  async function send(event: React.FormEvent) {
-    event.preventDefault();
-    if (!selected || !draft.trim()) return;
-    setWorking(true);
-    try {
-      const response = await sendWhatsAppMessage(selected.id, draft.trim());
-      setMessages((current) => [...current, response.message]);
-      setDraft("");
-      await loadConversations(selected.id);
-    } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : "Não foi possível enviar a mensagem.");
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  return (
-    <main className={styles.page}>
-      <header className={styles.header}>
-        <div>
-          <Link href="/atendimento" className={styles.back}><ChevronLeft size={16} /> Atendimento</Link>
-          <p className={styles.eyebrow}>WhatsApp Cloud API</p>
-          <h1>Inbox do WhatsApp</h1>
-        </div>
-        <button type="button" onClick={() => void loadConversations()} className={styles.refresh} disabled={loading}>
-          <RefreshCw size={16} /> Atualizar
-        </button>
-      </header>
-
-      {error ? <p className={styles.error}><CircleAlert size={16} /> {error}</p> : null}
-
-      <section className={styles.workspace}>
-        <aside className={styles.list}>
-          <div className={styles.listHeader}>
-            <div><p className={styles.eyebrow}>Conversas</p><h2>Caixa de entrada</h2></div>
-            <span>{conversations.length}</span>
-          </div>
-          {loading ? <p className={styles.placeholder}>Carregando conversas…</p> : null}
-          {!loading && conversations.length === 0 ? <p className={styles.placeholder}>Ainda não há mensagens recebidas neste canal.</p> : null}
-          <div className={styles.conversationList}>
-            {conversations.map((conversation) => (
-              <button key={conversation.id} type="button" onClick={() => void selectConversation(conversation)} className={`${styles.conversation} ${selected?.id === conversation.id ? styles.active : ""}`}>
-                <span className={styles.avatar}>{initials(conversation.contact.name)}</span>
-                <span className={styles.conversationText}>
-                  <strong>{conversation.contact.name}</strong>
-                  <span>{conversation.lastMessage || conversation.contact.phone}</span>
-                </span>
-                <time>{formatTime(conversation.lastMessageAt)}</time>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <section className={styles.chat}>
-          {selected ? <>
-            <header className={styles.chatHeader}>
-              <div className={styles.contact}><span className={styles.avatar}>{initials(selected.contact.name)}</span><div><h2>{selected.contact.name}</h2><p>{selected.contact.phone} · {statusLabel[selected.status]}</p></div></div>
-              <span className={styles.lock}>{selected.lockedBy === "ai" ? <><Bot size={14} /> IA</> : <><UserRound size={14} /> {selected.lockedBy === "app" ? "App do celular" : "Equipe"}</>}</span>
-            </header>
-            <div className={styles.messages}>
-              {messages.map((message) => <div key={message.id} className={`${styles.row} ${message.direction === "outbound" ? styles.outbound : ""}`}>
-                <article className={styles.message}>
-                  {message.senderType === "app" ? <small>Enviada pelo App do celular</small> : null}
-                  {message.messageType === "image" || message.messageType === "sticker" || message.messageType === "video" || message.messageType === "audio" || message.messageType === "document"
-                    ? <WhatsAppMedia message={message} />
-                    : <p>{message.bodyText || `[${message.mediaType || "Mensagem"}]`}</p>}
-                  <span>{formatTime(message.createdAt)} {message.direction === "outbound" ? <CheckCheck size={13} /> : null}</span>
-                </article>
-              </div>)}
-            </div>
-            <form onSubmit={send} className={styles.composer}>
-              <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Escreva uma mensagem" disabled={working || selected.status === "resolved"} />
-              <button type="submit" disabled={working || !draft.trim() || selected.status === "resolved"} aria-label="Enviar mensagem"><Send size={18} /></button>
-            </form>
-          </> : <div className={styles.emptyChat}><MessageCircle size={28} /><p>Selecione uma conversa para ver o histórico.</p></div>}
-        </section>
-
-        <aside className={styles.details}>
-          {selected ? <>
-            <p className={styles.eyebrow}>Atendimento</p>
-            <h2>{selected.contact.name}</h2>
-            <dl><div><dt>Status</dt><dd>{statusLabel[selected.status]}</dd></div><div><dt>Responsável</dt><dd>{selected.assignedName || "Não atribuído"}</dd></div><div><dt>Controle</dt><dd>{selected.lockedBy === "ai" ? "IA" : selected.lockedBy === "app" ? "App do celular" : "Humano"}</dd></div></dl>
-            <div className={styles.actions}>
-              <button type="button" onClick={() => void updateConversation("claim")} disabled={working || selected.status === "resolved"}>Assumir atendimento</button>
-              <button type="button" onClick={() => void updateConversation("release")} disabled={working || selected.status === "resolved"}>Liberar para IA</button>
-              <button type="button" onClick={() => void updateConversation("resolve")} disabled={working || selected.status === "resolved"}>Resolver conversa</button>
-            </div>
-            <p className={styles.aiNotice}><Bot size={16} /> A IA não envia mensagens nesta etapa. Quando o atendimento é humano ou pelo app, ela permanece bloqueada.</p>
-          </> : null}
-        </aside>
-      </section>
-    </main>
-  );
+  const visibleConversations = conversations.filter((conversation) => { const query = search.trim().toLowerCase(); return !query || conversation.contact.name.toLowerCase().includes(query) || conversation.contact.phone.includes(query); });
+  return <main className={styles.page}>
+    <header className={styles.topbar}><div className={styles.channelTabs}><Link href="/atendimento" className={styles.back}><ChevronLeft size={16} /> Atendimento</Link><button type="button" className={styles.tabActive}>Todas as mensagens <span>{conversations.length}</span></button><button type="button" className={styles.tab}>Messenger</button><button type="button" className={styles.tab}>Instagram</button><button type="button" className={styles.tab}>WhatsApp <span>{conversations.length}</span></button></div><button type="button" onClick={() => void loadConversations()} className={styles.refresh} disabled={loading}><RefreshCw size={15} /> Atualizar</button></header>
+    {error ? <p className={styles.error}><CircleAlert size={16} /> {error}<button type="button" onClick={() => setError(null)}><X size={14} /></button></p> : null}
+    <section className={styles.workspace}>
+      <aside className={styles.list}><div className={styles.searchRow}><div className={styles.searchBox}><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar" /></div><button type="button" className={styles.squareButton} aria-label="Nova mensagem"><MessageCircle size={17} /></button><button type="button" className={styles.manageButton}><Tag size={15} /> Gerenciar</button></div><div className={styles.filters}><button type="button" className={styles.filterActive}>Não lidas</button><button type="button">Prioridade</button><button type="button">Respostas a anúncios</button><button type="button" aria-label="Filtros"><MoreHorizontal size={16} /></button></div><div className={styles.inboxNotice}><Star size={15} /><div><strong>Do more with messaging</strong><a href="#more">Ver mais</a></div><X size={16} /></div><div className={styles.conversationList}>{loading ? <p className={styles.placeholder}>Carregando conversas…</p> : null}{!loading && visibleConversations.length === 0 ? <p className={styles.placeholder}>Ainda não há mensagens neste canal.</p> : null}{visibleConversations.map((conversation) => <button key={conversation.id} type="button" onClick={() => void selectConversation(conversation)} className={`${styles.conversation} ${selected?.id === conversation.id ? styles.active : ""}`}><span className={styles.avatar}>{initials(conversation.contact.name)}<i><MessageCircle size={10} /></i></span><span className={styles.conversationText}><strong>{conversation.contact.name}</strong><span>{conversation.lastMessage || "Nenhuma mensagem ainda"}</span></span><time>{formatTime(conversation.lastMessageAt)}</time></button>)}</div></aside>
+      <section className={styles.chat}>{selected ? <><header className={styles.chatHeader}><div className={styles.contact}><span className={styles.avatar}>{initials(selected.contact.name)}<i><MessageCircle size={10} /></i></span><div><h2>{selected.contact.name}</h2><p>{selected.contact.phone}</p><button type="button" className={styles.assignButton} onClick={() => void updateConversation(selected.lockedBy === "human" ? "release" : "claim")}><span className={styles.statusDot} /> {selected.lockedBy === "human" ? "Atendimento humano" : selected.lockedBy === "ai" ? "Atribuir esta conversa" : "App do celular"}</button></div></div><div className={styles.chatTools}><button type="button" aria-label="Sinalizar"><CircleAlert size={17} /></button><button type="button" aria-label="Excluir"><Trash2 size={17} /></button><button type="button" aria-label="Favoritar"><Star size={17} /></button><button type="button" aria-label="Arquivar"><Archive size={17} /></button><button type="button" aria-label="Resolver" onClick={() => void updateConversation("resolve")}><Check size={17} /></button></div></header><div className={styles.messages}>{messages.map((message) => <div key={message.id} className={`${styles.row} ${message.direction === "outbound" ? styles.outbound : ""}`}><article className={styles.message}>{message.senderType === "app" ? <small>Enviada pelo App do celular</small> : null}{message.messageType ? <WhatsAppMedia message={message} /> : <p>{message.bodyText || `[${message.mediaType || "Mensagem"}]`}</p>}<span>{formatTime(message.createdAt)} {message.direction === "outbound" ? <CheckCheck size={13} /> : null}</span></article></div>)}</div><form onSubmit={send} className={styles.composer}>{attachment ? <div className={styles.attachmentPreview}><FileText size={16} /><span>{attachment.name}</span><button type="button" onClick={() => setAttachment(null)} aria-label="Remover anexo"><X size={14} /></button></div> : null}<div className={styles.composerRow}><span className={styles.composerAvatar}>{initials(selected.contact.name)}</span><input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={attachment ? "Adicionar uma legenda…" : "Responder no WhatsApp…"} disabled={working || selected.status === "resolved"} /><button type="button" className={styles.composerIcon} onClick={() => fileInputRef.current?.click()} aria-label="Anexar arquivo"><Paperclip size={19} /></button><button type="button" className={styles.composerIcon} onClick={() => setDraft((value) => `${value}${value ? " " : ""}🙂`)} aria-label="Adicionar emoji"><Smile size={19} /></button><button type="button" className={`${styles.composerIcon} ${recording ? styles.recording : ""}`} onClick={() => void toggleRecording()} aria-label={recording ? "Parar gravação" : "Gravar áudio"}>{recording ? <LoaderCircle size={19} /> : <Volume2 size={19} />}</button><button type="submit" className={styles.sendButton} disabled={working || (!draft.trim() && !attachment) || selected.status === "resolved"} aria-label="Enviar mensagem">{working ? <LoaderCircle size={18} /> : <Send size={18} />}</button></div><input ref={fileInputRef} type="file" hidden accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" onChange={(event) => { chooseFile(event.target.files?.[0]); event.currentTarget.value = ""; }} /><div className={styles.composerHint}><ImagePlus size={13} /> Fotos e vídeos <FileText size={13} /> Documentos <Volume2 size={13} /> Áudios · até 32 MB</div></form></> : <div className={styles.emptyChat}><MessageCircle size={30} /><p>Selecione uma conversa para ver o histórico.</p></div>}</section>
+      <aside className={styles.details}>{selected ? <><div className={styles.detailsHeader}><span className={styles.avatarLarge}>{initials(selected.contact.name)}</span><strong>{selected.contact.name}</strong><div><button type="button" aria-label="Mais opções"><MoreHorizontal size={18} /></button><button type="button" aria-label="Fechar painel"><ChevronLeft size={18} /></button></div></div><div className={styles.about}><div className={styles.sectionTitle}><h3>Sobre</h3><button type="button">Editar</button></div><p>{selected.contact.phone}</p><a href={`tel:+${selected.contact.phone}`}><Phone size={14} /> Ligar para contato</a></div><div className={styles.detailSection}><div className={styles.sectionTitle}><h3>Etiquetas <span>i</span></h3><button type="button">Gerenciar etiquetas</button></div><input className={styles.tagInput} placeholder="Adicionar etiqueta" /><label className={styles.suggestedTag}><input type="checkbox" /> <span>Novo cliente</span></label><label className={styles.suggestedTag}><input type="checkbox" /> <span>Data de hoje</span></label></div><div className={styles.detailSection}><div className={styles.sectionTitle}><h3>Notas</h3></div><p className={styles.mutedCopy}>Acompanhe interações importantes com o cliente.</p><button type="button" className={styles.addNote}><span>＋</span> Adicionar nota</button></div><div className={styles.detailSection}><div className={styles.sectionTitle}><h3>Atendimento</h3></div><dl><div><dt>Status</dt><dd>{statusLabel[selected.status]}</dd></div><div><dt>Responsável</dt><dd>{selected.assignedName || "Não atribuído"}</dd></div><div><dt>Controle</dt><dd>{selected.lockedBy === "ai" ? "IA" : selected.lockedBy === "app" ? "App do celular" : "Humano"}</dd></div></dl><div className={styles.actions}><button type="button" onClick={() => void updateConversation("claim")} disabled={working || selected.status === "resolved"}><UserRound size={14} /> Assumir atendimento</button><button type="button" onClick={() => void updateConversation("release")} disabled={working || selected.status === "resolved"}><Bot size={14} /> Liberar para IA</button><button type="button" onClick={() => void updateConversation("resolve")} disabled={working || selected.status === "resolved"}><Check size={14} /> Resolver conversa</button></div></div></> : <p className={styles.placeholder}>Selecione uma conversa.</p>}</aside>
+    </section>
+  </main>;
 }
