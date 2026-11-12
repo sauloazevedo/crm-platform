@@ -848,6 +848,30 @@ export function resolveWhatsAppConversation(id: string) {
   return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/resolve`, { method: "POST" });
 }
 
+export function assignWhatsAppConversation(id: string, userId: string | null) {
+  return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export type WhatsAppQuickReply = { id: string; title: string; body: string; createdAt: string | null };
+
+export function getWhatsAppQuickReplies() {
+  return whatsappRequest<{ quickReplies: WhatsAppQuickReply[] }>("/whatsapp/quick-replies");
+}
+
+export function createWhatsAppQuickReply(title: string, body: string) {
+  return whatsappRequest<{ quickReply: WhatsAppQuickReply }>("/whatsapp/quick-replies", {
+    method: "POST",
+    body: JSON.stringify({ title, body }),
+  });
+}
+
+export function deleteWhatsAppQuickReply(id: string) {
+  return whatsappRequest<{ deleted: boolean; id: string }>(`/whatsapp/quick-replies/${id}`, { method: "DELETE" });
+}
+
 export function toggleWhatsAppConversationPriority(id: string) {
   return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/priority`, { method: "POST" });
 }
