@@ -782,6 +782,11 @@ export function getWhatsAppConversations() {
   return whatsappRequest<{ conversations: WhatsAppConversation[] }>("/whatsapp/conversations");
 }
 
+export function waitWhatsAppConversationUpdates(since: string | null) {
+  const query = since ? `?since=${encodeURIComponent(since)}` : "";
+  return whatsappRequest<{ changed: boolean; lastMessageAt: string | null }>(`/whatsapp/updates${query}`);
+}
+
 export async function getWhatsAppMedia(messageId: string) {
   const headers = await getAuthHeaders({ includeJsonContentType: false });
   if (!headers) throw new Error("Missing authenticated user token.");
