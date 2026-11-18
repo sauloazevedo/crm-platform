@@ -13,3 +13,117 @@
 .deliveryErrorIcon {
   color: #b23a32;
 }
+
+.mediaImageButton {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.replyAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 5px;
+  padding: 0;
+  border: 0;
+  color: #5b7480;
+  background: transparent;
+  cursor: pointer;
+  font-size: .62rem;
+}
+
+.replyAction:hover {
+  color: #0b76a8;
+}
+
+.replyQuote {
+  display: block;
+  margin-bottom: 6px;
+  padding-left: 7px;
+  border-left: 2px solid #79b6c5;
+  color: #5b7480;
+  font-size: .65rem;
+  line-height: 1.35;
+}
+
+.replyPreview {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  padding: 7px 9px;
+  border-left: 3px solid #168aaf;
+  color: #365665;
+  background: #eef8fa;
+  font-size: .7rem;
+}
+
+.replyPreview span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replyPreview button {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  color: #536c78;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lightboxImage {
+  display: block;
+  max-width: min(92vw, 1400px);
+  max-height: 82vh;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.lightboxCard {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 94vw;
+  max-height: 92vh;
+  padding: 16px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(25, 45, 55, .7);
+  cursor: pointer;
+}
+
+.lightboxDownload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 4px;
+  color: #fff;
+  background: #168aaf;
+  text-decoration: none;
+  font-size: .72rem;
+}

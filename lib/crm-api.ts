@@ -743,6 +743,7 @@ export type WhatsAppMessage = {
   bodyText: string | null;
   mediaType: string | null;
   mediaId: string | null;
+  replyToMessageId?: string | null;
   messageType?: "image" | "sticker" | "video" | "audio" | "document" | null;
   mediaCaption?: string | null;
   status: string | null;
@@ -790,10 +791,10 @@ export function waitWhatsAppConversationUpdates(since: string | null) {
   return whatsappRequest<{ changed: boolean; lastMessageAt: string | null }>(`/whatsapp/updates${query}`);
 }
 
-export async function getWhatsAppMedia(messageId: string) {
+export async function getWhatsAppMedia(messageId: string, download = false) {
   const headers = await getAuthHeaders({ includeJsonContentType: false });
   if (!headers) throw new Error("Missing authenticated user token.");
-  const response = await fetch(`${getApiBaseUrl()}/atendimento/whatsapp/media/${encodeURIComponent(messageId)}?format=json`, { headers: { ...headers, Accept: "application/json" } });
+  const response = await fetch(`${getApiBaseUrl()}/atendimento/whatsapp/media/${encodeURIComponent(messageId)}?format=json${download ? "&download=1" : ""}`, { headers: { ...headers, Accept: "application/json" } });
   if (!response.ok) throw new Error(await readApiError(response, "Could not retrieve WhatsApp media."));
   const payload = await response.json() as { url?: string };
   if (!payload.url) throw new Error("WhatsApp media URL was not returned.");
@@ -804,10 +805,10 @@ export function getWhatsAppConversation(id: string) {
   return whatsappRequest<{ conversation: WhatsAppConversation; messages: WhatsAppMessage[] }>(`/whatsapp/conversations/${id}`);
 }
 
-export function sendWhatsAppMessage(id: string, body: string) {
+export function sendWhatsAppMessage(id: string, body: string, replyToMessageId?: string | null) {
   return whatsappRequest<{ message: WhatsAppMessage }>(`/whatsapp/conversations/${id}/messages`, {
     method: "POST",
-    body: JSON.stringify({ body }),
+    body: JSON.stringify({ body, replyToMessageId: replyToMessageId || undefined }),
   });
 }
 
@@ -817,6 +818,7 @@ export type WhatsAppOutgoingMedia = {
   messageType: "image" | "sticker" | "video" | "audio" | "document";
   size?: number;
   caption?: string;
+  replyToMessageId?: string | null;
 };
 
 export async function createWhatsAppMediaUpload(id: string, file: File, messageType?: WhatsAppOutgoingMedia["messageType"]) {
@@ -837,7 +839,7 @@ export async function createWhatsAppMediaUpload(id: string, file: File, messageT
 export function sendWhatsAppMedia(id: string, media: WhatsAppOutgoingMedia) {
   return whatsappRequest<{ message: WhatsAppMessage }>(`/whatsapp/conversations/${id}/messages`, {
     method: "POST",
-    body: JSON.stringify({ media }),
+    body: JSON.stringify({ media, replyToMessageId: media.replyToMessageId || undefined }),
   });
 }
 
