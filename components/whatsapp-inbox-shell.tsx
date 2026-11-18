@@ -59,14 +59,31 @@ function QuickReplyDock({ onInsert }: { onInsert: (body: string) => void }) {
 }
 
 function WhatsAppMedia({ message }: { message: WhatsAppMessage }) {
-  const [src, setSrc] = useState<string | null>(null); const [unavailable, setUnavailable] = useState(false);
-  useEffect(() => { if (!isRenderableMedia(message)) return; let active = true; void getWhatsAppMedia(message.id).then((url) => { if (active) setSrc(url); }).catch(() => { if (active) setUnavailable(true); }); return () => { active = false; }; }, [message.id, message.messageType]);
+  const [src, setSrc] = useState<string | null>(null); const [unavailable, setUnavailable] = useState(false); const [attempt, setAttempt] = useState(0);
+  useEffect(() => { setAttempt(0); }, [message.id, message.messageType]);
+  useEffect(() => {
+    if (!isRenderableMedia(message)) return;
+    let active = true;
+    let retryTimer: number | undefined;
+    setSrc(null);
+    setUnavailable(false);
+    void getWhatsAppMedia(message.id).then((url) => { if (active) setSrc(url); }).catch(() => {
+      if (!active) return;
+      if (attempt < 5) {
+        retryTimer = window.setTimeout(() => setAttempt((current) => current + 1), Math.min(1000 * (attempt + 1), 5000));
+      } else setUnavailable(true);
+    });
+    return () => { active = false; if (retryTimer) window.clearTimeout(retryTimer); };
+  }, [message.id, message.messageType, attempt]);
+  function retryAfterMediaError() {
+    if (attempt < 5) { setSrc(null); setAttempt((current) => current + 1); } else setUnavailable(true);
+  }
   if (unavailable) return <p className={styles.mediaUnavailable}>[mídia indisponível]</p>;
   if (!src) return <p className={styles.mediaLoading}>Carregando mídia…</p>;
-  if (message.messageType === "video") return <><video src={src} controls preload="metadata" /><p>{message.mediaCaption || null}</p></>;
-  if (message.messageType === "audio") return <><audio src={src} controls preload="metadata" /><p>{message.mediaCaption || null}</p></>;
+  if (message.messageType === "video") return <><video src={src} controls preload="metadata" onError={retryAfterMediaError} /><p>{message.mediaCaption || null}</p></>;
+  if (message.messageType === "audio") return <><audio src={src} controls preload="metadata" onError={retryAfterMediaError} /><p>{message.mediaCaption || null}</p></>;
   if (message.messageType === "document") return <p className={styles.documentMessage}><FileText size={18} /><a href={src} target="_blank" rel="noreferrer">Abrir documento</a>{message.mediaCaption ? ` — ${message.mediaCaption}` : ""}</p>;
-  return <><img src={src} alt={message.mediaCaption || "Mídia recebida no WhatsApp"} /><p>{message.mediaCaption || null}</p></>;
+  return <><img src={src} alt={message.mediaCaption || "Mídia recebida no WhatsApp"} onError={retryAfterMediaError} /><p>{message.mediaCaption || null}</p></>;
 }
 
 export function WhatsAppInboxShell() {
