@@ -746,6 +746,9 @@ export type WhatsAppMessage = {
   messageType?: "image" | "sticker" | "video" | "audio" | "document" | null;
   mediaCaption?: string | null;
   status: string | null;
+  deliveryStatus?: string | null;
+  deliveryErrorCode?: number | null;
+  deliveryError?: string | null;
   createdAt: string;
 };
 
