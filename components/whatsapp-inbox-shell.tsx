@@ -28,7 +28,7 @@ function deliveryNotice(message: WhatsAppMessage) {
   const status = message.deliveryStatus || message.status;
   if (status === "failed" || message.deliveryErrorCode) {
     if (message.deliveryErrorCode === 131047) return "Não enviada: a janela de atendimento de 24 horas expirou. O cliente precisa responder novamente ou será necessário usar um template aprovado.";
-    if (message.deliveryErrorCode === 131005) return "Não enviada: a Meta negou a autorização para este número ou destinatário.";
+    if (message.deliveryErrorCode === 131005) return "Não enviada (Meta 131005): autorização recusada. Verifique o token, as permissões do app, a WABA e o Phone Number ID no Secrets Manager.";
     return `Não enviada${message.deliveryError ? `: ${message.deliveryError}` : "."}`;
   }
   return null;
