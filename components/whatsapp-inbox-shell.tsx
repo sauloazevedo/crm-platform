@@ -35,6 +35,11 @@ function deliveryNotice(message: WhatsAppMessage) {
 }
 function deliverySucceeded(message: WhatsAppMessage) { return message.direction === "outbound" && ["delivered", "read"].includes(message.deliveryStatus || message.status || ""); }
 function deliveryFailed(message: WhatsAppMessage) { return message.direction === "outbound" && ((message.deliveryStatus || message.status) === "failed" || Boolean(message.deliveryErrorCode)); }
+function mediaFailureNotice(message: WhatsAppMessage) {
+  if (!message.mediaError) return null;
+  if (message.mediaError.includes("code 190") || message.mediaError.includes("401")) return "Token do WhatsApp expirado ou inválido. Atualize o token no Secrets Manager.";
+  return message.mediaError;
+}
 
 function workspaceUserName(user: WorkspaceAccessUser) {
   return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
@@ -78,7 +83,7 @@ function WhatsAppMedia({ message, onImageClick }: { message: WhatsAppMessage; on
   function retryAfterMediaError() {
     if (attempt < 5) { setSrc(null); setAttempt((current) => current + 1); } else setUnavailable(true);
   }
-  if (unavailable) return <p className={styles.mediaUnavailable}>[mídia indisponível]</p>;
+  if (unavailable) return <p className={styles.mediaUnavailable}>[mídia indisponível]{mediaFailureNotice(message) ? ` — ${mediaFailureNotice(message)}` : ""}</p>;
   if (!src) return <p className={styles.mediaLoading}>Carregando mídia…</p>;
   if (message.messageType === "video") return <><video src={src} controls preload="metadata" onError={retryAfterMediaError} /><p>{message.mediaCaption || null}</p></>;
   if (message.messageType === "audio") return <><audio src={src} controls preload="metadata" onError={retryAfterMediaError} /><p>{message.mediaCaption || null}</p></>;

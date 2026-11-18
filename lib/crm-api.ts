@@ -750,6 +750,8 @@ export type WhatsAppMessage = {
   deliveryStatus?: string | null;
   deliveryErrorCode?: number | null;
   deliveryError?: string | null;
+  mediaStatus?: string | null;
+  mediaError?: string | null;
   createdAt: string;
 };
 
