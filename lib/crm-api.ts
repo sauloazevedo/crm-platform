@@ -845,6 +845,10 @@ export function sendWhatsAppMedia(id: string, media: WhatsAppOutgoingMedia) {
   });
 }
 
+export function deleteWhatsAppMessage(conversationId: string, messageId: string) {
+  return whatsappRequest<{ deleted: boolean; messageId: string; scope: "crm" }>(`/whatsapp/conversations/${conversationId}/messages/${encodeURIComponent(messageId)}`, { method: "DELETE" });
+}
+
 export function claimWhatsAppConversation(id: string) {
   return whatsappRequest<{ conversation: WhatsAppConversation }>(`/whatsapp/conversations/${id}/claim`, { method: "POST" });
 }
