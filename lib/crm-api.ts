@@ -762,6 +762,8 @@ export type WhatsAppConversation = {
   assignedName: string | null;
   lockedBy: "ai" | "human" | "app" | null;
   lockedAt: string | null;
+  needsHuman: boolean;
+  lastAutomationAction: string | null;
   isPriority: boolean;
   isStarred: boolean;
   archivedAt: string | null;
@@ -773,6 +775,18 @@ export type WhatsAppConversation = {
     phone: string;
   };
   lastMessage: string | null;
+};
+
+export type WhatsAppAutomationLog = {
+  id: string;
+  ruleKey: string;
+  action: "reply" | "transfer" | "no_reply";
+  responseText: string | null;
+  confidence: number;
+  reason: string;
+  mode: "shadow" | "active";
+  executionStatus: "planned" | "queued" | "blocked" | "failed";
+  createdAt: string;
 };
 
 async function whatsappRequest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -804,7 +818,7 @@ export async function getWhatsAppMedia(messageId: string, download = false) {
 }
 
 export function getWhatsAppConversation(id: string) {
-  return whatsappRequest<{ conversation: WhatsAppConversation; messages: WhatsAppMessage[] }>(`/whatsapp/conversations/${id}`);
+  return whatsappRequest<{ conversation: WhatsAppConversation; messages: WhatsAppMessage[]; automationLogs: WhatsAppAutomationLog[] }>(`/whatsapp/conversations/${id}`);
 }
 
 export function sendWhatsAppMessage(id: string, body: string, replyToMessageId?: string | null) {
