@@ -1,0 +1,15 @@
+.quickReplyMenu {
+  position: absolute;
+  top: auto;
+  right: 0;
+  bottom: 38px;
+  max-height: min(370px, calc(100dvh - 120px));
+}
+
+.deliveryCheck {
+  color: #16a05d;
+}
+
+.deliveryErrorIcon {
+  color: #b23a32;
+}
