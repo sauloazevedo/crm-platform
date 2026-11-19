@@ -94,6 +94,14 @@ html[data-theme="clean"] body {
   line-height: 1.4;
 }
 
+/* Clean design system: controls use the same compact radius as the dashboard. */
+html[data-theme="clean"] button,
+html[data-theme="clean"] input,
+html[data-theme="clean"] select,
+html[data-theme="clean"] textarea {
+  border-radius: 7px !important;
+}
+
 a {
   color: inherit;
   text-decoration: none;
