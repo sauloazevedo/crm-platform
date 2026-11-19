@@ -323,7 +323,14 @@ function getTagAccentVar(value?: string | null) {
   return `var(--tag-accent-${(hash % 5) + 1})`;
 }
 
-export function LeadsShell() {
+type LeadsShellProps = {
+  embeddedLeadId?: string | null;
+  embeddedNewLeadPhone?: string | null;
+  onEmbeddedClose?: () => void;
+  onEmbeddedSaved?: (lead: LeadRecord) => void;
+};
+
+export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClose, onEmbeddedSaved }: LeadsShellProps = {}) {
   const auth = useAuth();
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<LeadRecord[]>([]);
@@ -619,6 +626,20 @@ export function LeadsShell() {
   }
 
   useEffect(() => {
+    if (embeddedLeadId || embeddedNewLeadPhone) {
+      let active = true;
+      void getLeads({ limit: 1000, offset: 0 }).then((response) => {
+        if (!active) return;
+        if (embeddedLeadId) {
+          const lead = response.leads.find((item) => item.id === embeddedLeadId);
+          if (lead) void openLeadEditor(lead);
+        } else {
+          openNewLeadModal();
+          setEditorForm((current) => ({ ...current, phoneNumber: embeddedNewLeadPhone || current.phoneNumber }));
+        }
+      }).catch(() => undefined);
+      return () => { active = false; };
+    }
     const leadId = searchParams.get("leadId");
     const shouldCreate = searchParams.get("new") === "1";
     if (!leadId && !shouldCreate) return;
@@ -635,7 +656,7 @@ export function LeadsShell() {
       }
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [searchParams]);
+  }, [searchParams, embeddedLeadId, embeddedNewLeadPhone]);
 
   function renderSearchBox(className?: string) {
     return (
@@ -764,6 +785,7 @@ export function LeadsShell() {
     setExpandedLeadTaskId(null);
     setLeadTaskDrafts({});
     setEditorInvoices([]);
+    onEmbeddedClose?.();
   }
 
   async function openEngagementLetter() {
@@ -875,6 +897,7 @@ export function LeadsShell() {
       if (selectedLead) {
         const response = await updateLead(selectedLead.id, payload);
         setLeads((current) => current.map((lead) => (lead.id === selectedLead.id ? response.lead : lead)));
+        onEmbeddedSaved?.(response.lead);
       } else {
         const response = await createLead({
           ...payload,
@@ -883,6 +906,7 @@ export function LeadsShell() {
             .filter((company) => company.companyName && company.companyName !== "New company"),
         });
         setLeads((current) => [response.lead, ...current]);
+        onEmbeddedSaved?.(response.lead);
       }
 
       closeLeadModal();
@@ -1309,7 +1333,7 @@ export function LeadsShell() {
   }
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${embeddedLeadId || embeddedNewLeadPhone ? styles.embeddedPage : ""}`}>
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Lead directory</p>
@@ -1475,7 +1499,7 @@ export function LeadsShell() {
       </section>
 
       {isLeadModalOpen ? (
-        <div className={crmStyles.modalOverlay} onClick={closeLeadModal}>
+        <div className={crmStyles.modalOverlay} data-lead-editor-modal="true" onClick={closeLeadModal}>
           <aside className={crmStyles.modalCard} onClick={(event) => event.stopPropagation()}>
             <div className={crmStyles.modalHeader}>
               <div>

@@ -682,3 +682,5 @@
     display: grid;
   }
 }
+.embeddedPage { visibility: hidden; }
+.embeddedPage [data-lead-editor-modal="true"] { visibility: visible; }

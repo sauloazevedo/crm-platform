@@ -89,6 +89,9 @@ html[data-theme="light"] body {
 html[data-theme="clean"] body {
   background: #edf5f8;
   color: var(--text);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 a {
