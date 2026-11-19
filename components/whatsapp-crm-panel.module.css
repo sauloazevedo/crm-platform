@@ -1,11 +1,11 @@
-.panel { padding: 16px 14px; border-bottom: 1px solid #dbe4e8; }
+.panel { padding: 16px 14px; border-bottom: 1px solid #dbe4e8; font-family: "Avenir Next", "Segoe UI", sans-serif; }
 .header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #405564; }
 .header h3 { margin: 0; font-size: .79rem; }
 .header p { margin: 5px 0 0; color: #87959d; font-size: .68rem; line-height: 1.35; }
 .status, .error { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; color: #71838c; font-size: .68rem; }
 .error { color: #a3372f; }
 .spin { animation: spin 1s linear infinite; }
-.leadCard { display: grid; grid-template-columns: 34px minmax(0, 1fr) 28px; align-items: center; gap: 8px; margin-top: 12px; padding: 8px; border: 1px solid #d4e2e7; border-radius: 5px; background: #f8fbfc; }
+.leadCard { display: grid; grid-template-columns: 34px minmax(0, 1fr) 28px; align-items: center; gap: 8px; margin-top: 12px; padding: 8px; border: 1px solid #c7d5db; border-radius: 4px; background: #f8fbfc; }
 .avatar { display: grid; place-items: center; width: 30px; height: 30px; overflow: hidden; border-radius: 50%; color: #fff; background: #7ca6b4; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .identity { min-width: 0; }
@@ -16,4 +16,20 @@
 .leadCard button:hover { background: #e8f4f8; }
 .empty p { margin: 12px 0 9px; color: #7a8c95; font-size: .68rem; line-height: 1.35; }
 .empty button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 9px; border: 1px solid #b8cbd3; border-radius: 4px; color: #168aaf; background: #fff; cursor: pointer; font-size: .68rem; }
+.modalOverlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 24px; background: rgba(24, 45, 56, .32); }
+.leadModal { width: min(100%, 620px); max-height: min(760px, 92vh); overflow: auto; padding: 22px; border: 1px solid #c7d5db; border-radius: 6px; background: #fff; box-shadow: 0 18px 50px rgba(25, 52, 66, .24); color: #263440; }
+.modalHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #dbe4e8; }
+.modalEyebrow { color: #168aaf; font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.modalHeader h4 { margin: 4px 0 0; font-size: 1.05rem; font-weight: 700; }
+.modalClose { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #c7d5db; border-radius: 4px; color: #526672; background: #fff; cursor: pointer; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 18px 0; }
+.formGrid label { display: grid; gap: 5px; color: #536673; font-size: .7rem; font-weight: 600; }
+.formGrid input, .formGrid textarea { width: 100%; padding: 9px 10px; border: 1px solid #bfced6; border-radius: 4px; outline: none; color: #263440; background: #fff; font-size: .76rem; }
+.formGrid input:focus, .formGrid textarea:focus { border-color: #168aaf; box-shadow: 0 0 0 2px rgba(22, 138, 175, .12); }
+.fullField { grid-column: 1 / -1; }
+.modalActions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 14px; border-top: 1px solid #dbe4e8; }
+.modalActions button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border: 1px solid #bfcfd7; border-radius: 4px; color: #3c5562; background: #fff; cursor: pointer; font-size: .72rem; }
+.modalActions button[type="submit"] { border-color: #168aaf; color: #fff; background: #168aaf; }
+.modalActions button:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 620px) { .formGrid { grid-template-columns: 1fr; }.fullField { grid-column: auto; } }
 @keyframes spin { to { transform: rotate(360deg); } }
