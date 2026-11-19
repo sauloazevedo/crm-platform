@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Palette, Sun } from "lucide-react";
 import styles from "./theme-toggle.module.css";
 
-type Theme = "dark" | "light";
+type Theme = "dark" | "light" | "clean";
 
 const THEME_KEY = "smart-crm-theme";
 
@@ -13,7 +13,7 @@ export function ThemeToggle() {
 
   useEffect(() => {
     const savedTheme = localStorage.getItem(THEME_KEY);
-    const resolvedTheme: Theme = savedTheme === "light" ? "light" : "dark";
+    const resolvedTheme: Theme = savedTheme === "light" || savedTheme === "clean" ? savedTheme : "dark";
     setTheme(resolvedTheme);
     document.documentElement.dataset.theme = resolvedTheme;
   }, []);
@@ -34,6 +34,15 @@ export function ThemeToggle() {
       >
         <Moon size={16} strokeWidth={2} aria-hidden="true" />
         <span>Dark</span>
+      </button>
+      <button
+        type="button"
+        className={theme === "clean" ? styles.active : ""}
+        onClick={() => updateTheme("clean")}
+        aria-pressed={theme === "clean"}
+      >
+        <Palette size={16} strokeWidth={2} aria-hidden="true" />
+        <span>Clean</span>
       </button>
       <button
         type="button"

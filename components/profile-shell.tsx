@@ -15,6 +15,15 @@ import { handleConfirmResetPassword, handleResetPassword } from "../services/aut
 import { ThemeToggle } from "./theme-toggle";
 import styles from "./profile-shell.module.css";
 
+const whatsappColorOptions = [
+  { value: "blue", label: "Azul", swatch: "#168aaf" },
+  { value: "pink", label: "Rosa", swatch: "#d85c93" },
+  { value: "green", label: "Verde", swatch: "#3c9b72" },
+  { value: "orange", label: "Laranja", swatch: "#d9823b" },
+  { value: "purple", label: "Roxo", swatch: "#7a69b8" },
+  { value: "teal", label: "Turquesa", swatch: "#3a9e9a" },
+] as const;
+
 type Notice = {
   tone: "success" | "error";
   message: string;
@@ -47,6 +56,7 @@ export function ProfileShell() {
   const auth = useAuth();
   const [firstName, setFirstName] = useState(auth.user?.firstName ?? "");
   const [lastName, setLastName] = useState(auth.user?.lastName ?? "");
+  const [whatsappColor, setWhatsappColor] = useState(auth.user?.whatsappColor ?? "blue");
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -65,7 +75,8 @@ export function ProfileShell() {
   useEffect(() => {
     setFirstName(auth.user?.firstName ?? "");
     setLastName(auth.user?.lastName ?? "");
-  }, [auth.user?.firstName, auth.user?.lastName]);
+    setWhatsappColor(auth.user?.whatsappColor ?? "blue");
+  }, [auth.user?.firstName, auth.user?.lastName, auth.user?.whatsappColor]);
 
   useEffect(() => {
     let isMounted = true;
@@ -120,6 +131,7 @@ export function ProfileShell() {
       await updateCurrentUserProfile({
         firstName: trimmedFirstName,
         lastName: trimmedLastName,
+        whatsappColor,
       });
       await auth.refreshSession();
       setProfileNotice({ tone: "success", message: "Profile updated successfully." });
@@ -281,6 +293,26 @@ export function ProfileShell() {
                 placeholder="Your name"
               />
             </label>
+
+            <fieldset className={styles.colorField}>
+              <legend>Cor do responsável no WhatsApp</legend>
+              <p>Escolha a cor que identifica seus atendimentos no inbox.</p>
+              <div className={styles.colorOptions}>
+                {whatsappColorOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`${styles.colorOption} ${whatsappColor === option.value ? styles.colorOptionActive : ""}`}
+                    onClick={() => setWhatsappColor(option.value)}
+                    aria-label={option.label}
+                    aria-pressed={whatsappColor === option.value}
+                  >
+                    <span style={{ background: option.swatch }} />
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
 
             <label className={styles.field}>
               <span>Surname</span>

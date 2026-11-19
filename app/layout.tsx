@@ -21,7 +21,7 @@ export default function RootLayout({
             __html: `
               try {
                 var savedTheme = localStorage.getItem('smart-crm-theme');
-                var theme = savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark';
+                var theme = savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'clean' ? savedTheme : 'dark';
                 document.documentElement.dataset.theme = theme;
               } catch (error) {
                 document.documentElement.dataset.theme = 'dark';

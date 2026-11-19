@@ -1,0 +1,19 @@
+.panel { padding: 16px 14px; border-bottom: 1px solid #dbe4e8; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #405564; }
+.header h3 { margin: 0; font-size: .79rem; }
+.header p { margin: 5px 0 0; color: #87959d; font-size: .68rem; line-height: 1.35; }
+.status, .error { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; color: #71838c; font-size: .68rem; }
+.error { color: #a3372f; }
+.spin { animation: spin 1s linear infinite; }
+.leadCard { display: grid; grid-template-columns: 34px minmax(0, 1fr) 28px; align-items: center; gap: 8px; margin-top: 12px; padding: 8px; border: 1px solid #d4e2e7; border-radius: 5px; background: #f8fbfc; }
+.avatar { display: grid; place-items: center; width: 30px; height: 30px; overflow: hidden; border-radius: 50%; color: #fff; background: #7ca6b4; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.identity { min-width: 0; }
+.identity strong, .identity span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity strong { color: #304754; font-size: .72rem; }
+.identity span { margin-top: 3px; color: #7a8c95; font-size: .62rem; }
+.leadCard button { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 4px; color: #168aaf; background: transparent; cursor: pointer; }
+.leadCard button:hover { background: #e8f4f8; }
+.empty p { margin: 12px 0 9px; color: #7a8c95; font-size: .68rem; line-height: 1.35; }
+.empty button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 9px; border: 1px solid #b8cbd3; border-radius: 4px; color: #168aaf; background: #fff; cursor: pointer; font-size: .68rem; }
+@keyframes spin { to { transform: rotate(360deg); } }

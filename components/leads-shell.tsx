@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, Copy, Filter, Mail, Phone, Plus, Trash2 } from "lucide-react";
 import {
   createLead,
@@ -324,6 +325,7 @@ function getTagAccentVar(value?: string | null) {
 
 export function LeadsShell() {
   const auth = useAuth();
+  const searchParams = useSearchParams();
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [searchResults, setSearchResults] = useState<LeadRecord[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -615,6 +617,25 @@ export function LeadsShell() {
     setEditorLogs([]);
     setEditorInvoices([]);
   }
+
+  useEffect(() => {
+    const leadId = searchParams.get("leadId");
+    const shouldCreate = searchParams.get("new") === "1";
+    if (!leadId && !shouldCreate) return;
+    let active = true;
+    void getLeads({ limit: 1000, offset: 0 }).then((response) => {
+      if (!active) return;
+      if (leadId) {
+        const lead = response.leads.find((item) => item.id === leadId);
+        if (lead) void openLeadEditor(lead);
+      } else {
+        openNewLeadModal();
+        const phone = searchParams.get("phone");
+        if (phone) setEditorForm((current) => ({ ...current, phoneNumber: phone }));
+      }
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [searchParams]);
 
   function renderSearchBox(className?: string) {
     return (

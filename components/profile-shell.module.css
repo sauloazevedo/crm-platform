@@ -242,6 +242,58 @@
   color: color-mix(in srgb, var(--muted) 72%, transparent);
 }
 
+.colorField {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.colorField legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.colorField p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.colorOptions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.colorOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.colorOption span {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.colorOptionActive {
+  border-color: var(--accent-cool);
+  color: var(--text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-cool) 24%, transparent);
+}
+
 .passwordWrap {
   position: relative;
 }

@@ -203,11 +203,13 @@ export type CurrentUserProfile = {
   lastName: string | null;
   role: string;
   workspaceId?: string | null;
+  whatsappColor?: string | null;
 };
 
 export type UpdateCurrentUserProfileInput = {
   firstName: string;
   lastName: string;
+  whatsappColor?: string;
 };
 
 export type CreateBlogPostInput = {
@@ -242,6 +244,7 @@ export type WorkspaceAccessUser = {
   firstName: string | null;
   lastName: string | null;
   role: string;
+  whatsappColor?: string | null;
   invitationStatus: string;
   invitedBy?: string | null;
   createdAt?: string | null;
@@ -742,6 +745,7 @@ export type WhatsAppMessage = {
   senderType: "customer" | "ai" | "human" | "app";
   bodyText: string | null;
   mediaType: string | null;
+  mediaMimeType?: string | null;
   mediaId: string | null;
   replyToMessageId?: string | null;
   messageType?: "image" | "sticker" | "video" | "audio" | "document" | null;

@@ -143,3 +143,19 @@
   text-decoration: none;
   font-size: .72rem;
 }
+
+.mediaSaveButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin: 6px 0 0;
+  padding: 0 9px;
+  border: 1px solid #b7cfd7;
+  border-radius: 4px;
+  color: #176d87;
+  background: #fff;
+  cursor: pointer;
+  font-size: .68rem;
+}
+
+.mediaSaveButton:disabled { opacity: .65; cursor: default; }

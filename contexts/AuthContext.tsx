@@ -23,6 +23,7 @@ export type SessionUser = {
   lastName?: string;
   role?: string;
   workspaceId?: string | null;
+  whatsappColor?: string | null;
   sessionToken?: string;
   idToken?: string;
   accessToken?: string;
@@ -233,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           lastName: userProfile?.user.lastName ?? mappedUser.lastName,
           role: userProfile?.user.role ?? mappedUser.role,
           workspaceId: userProfile?.user.workspaceId ?? null,
+          whatsappColor: userProfile?.user.whatsappColor ?? "blue",
         });
       }
     } catch (error) {
