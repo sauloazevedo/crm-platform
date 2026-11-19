@@ -907,6 +907,125 @@
   font-size: 0.9rem;
 }
 
+.installmentPanel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 7px;
+  border: 1px solid rgba(50, 71, 85, 0.16);
+  background: #ffffff;
+  color: #1b1c20;
+}
+
+.installmentPanel .walletHeader {
+  align-items: flex-start;
+}
+
+.installmentPanel .walletHeader > div {
+  display: grid;
+  gap: 4px;
+}
+
+.installmentPanel .walletHeader small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.installmentEditorRows {
+  display: grid;
+  gap: 8px;
+}
+
+.installmentEditorRow {
+  display: grid;
+  grid-template-columns: 24px minmax(90px, 1fr) minmax(135px, 1fr) auto 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.installmentEditorRow input {
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #1b1c20;
+  font: inherit;
+}
+
+.installmentNumber {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e9f4f8;
+  color: #2d6177;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.installmentPayButton,
+.installmentPaidButton,
+.installmentDeleteButton {
+  min-height: 34px;
+  padding: 0 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.installmentPayButton {
+  border: 1px solid #b6cbd4;
+  background: #ffffff;
+  color: #2e6177;
+}
+
+.installmentPaidButton {
+  border: 1px solid #79b99b;
+  background: #e7f7ed;
+  color: #176b49;
+}
+
+.installmentDeleteButton {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  padding: 0;
+  border: 1px solid rgba(179, 69, 40, 0.2);
+  background: #fff7f4;
+  color: #b34528;
+}
+
+.installmentEditorRowPaid input {
+  background: #f2fbf5;
+}
+
+.installmentEmpty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.taskInstallmentSummary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid #dbecef;
+  background: #f1f9fa;
+  color: #386273;
+  font-size: 0.7rem;
+}
+
+.taskInstallmentSummary strong {
+  color: #1b667b;
+  font-size: 0.72rem;
+}
+
 .richEditorPanel {
   display: grid;
   gap: 8px;
@@ -1371,6 +1490,82 @@
   font-size: 0.98rem;
 }
 
+.serviceCostSection {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fbfcfd;
+}
+
+.serviceCostHeader h4,
+.serviceCostHeader p {
+  margin: 0;
+}
+
+.serviceCostHeader h4 {
+  color: #1b1c20;
+  font-size: 0.82rem;
+}
+
+.serviceCostHeader p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.serviceCostList {
+  display: grid;
+  gap: 6px;
+}
+
+.serviceCostColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 100px;
+  gap: 10px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.serviceCostRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 100px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #e6edf0;
+}
+
+.serviceCostRow > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.serviceCostRow strong,
+.serviceCostRow span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.serviceCostRow strong {
+  color: #1b1c20;
+  font-size: 0.74rem;
+}
+
+.serviceCostRow span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
 .invoiceStack {
   display: grid;
   gap: 12px;
@@ -1578,8 +1773,11 @@
 
   .invoiceGrid,
   .installmentRow,
+  .installmentEditorRow,
   .invoiceHeaderRow,
-  .taskWalletSummary {
+  .taskWalletSummary,
+  .serviceCostRow,
+  .serviceCostColumns {
     grid-template-columns: 1fr;
   }
 

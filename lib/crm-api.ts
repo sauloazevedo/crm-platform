@@ -173,6 +173,14 @@ export type LeadInvoiceRecord = LeadInvoiceInput & {
   updatedAt?: string | null;
 };
 
+export type TaskInstallment = {
+  id: string;
+  amount: number;
+  dueDate?: string | null;
+  status?: "pending" | "paid";
+  paidAt?: string | null;
+};
+
 export type TaskBoardTask = {
   id: string;
   title: string;
@@ -188,6 +196,7 @@ export type TaskBoardTask = {
     cost: number;
     revenue: number;
   }>;
+  installments?: TaskInstallment[];
 };
 
 export type TaskBoardLane = {

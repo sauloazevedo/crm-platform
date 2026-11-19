@@ -52,6 +52,14 @@ type WalletDraftItem = {
   revenue: string;
 };
 
+type TaskInstallmentDraft = {
+  id: string;
+  amount: string;
+  dueDate: string;
+  status: "pending" | "paid";
+  paidAt?: string | null;
+};
+
 type CsvColumnMapping = {
   leadName: string;
   taskTitle: string;
@@ -292,6 +300,36 @@ function toWalletItems(items: WalletDraftItem[], fallbackTitle: string) {
     .filter((item) => item.description || item.cost > 0 || item.revenue > 0);
 }
 
+function toInstallmentDrafts(
+  items?: Array<{
+    id: string;
+    amount: number;
+    dueDate?: string | null;
+    status?: "pending" | "paid";
+    paidAt?: string | null;
+  }>
+): TaskInstallmentDraft[] {
+  return (items ?? []).map((item) => ({
+    id: item.id,
+    amount: item.amount ? String(item.amount) : "",
+    dueDate: item.dueDate ?? "",
+    status: item.status === "paid" ? "paid" : "pending",
+    paidAt: item.paidAt ?? null,
+  }));
+}
+
+function toInstallments(items: TaskInstallmentDraft[]) {
+  return items
+    .map((item, index) => ({
+      id: item.id || `installment-${index + 1}`,
+      amount: parseMoney(item.amount),
+      dueDate: item.dueDate || null,
+      status: item.status,
+      paidAt: item.status === "paid" ? item.paidAt ?? new Date().toISOString() : null,
+    }))
+    .filter((item) => item.amount > 0 || item.dueDate);
+}
+
 function getWalletTotals(items: WalletDraftItem[]) {
   const totals = items.reduce(
     (current, item) => ({
@@ -349,7 +387,15 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
   const [collapsedLogs, setCollapsedLogs] = useState<Record<string, boolean>>({});
   const [expandedLeadTaskId, setExpandedLeadTaskId] = useState<string | null>(null);
   const [leadTaskDrafts, setLeadTaskDrafts] = useState<
-    Record<string, { notes: string; status: TaskStatus; walletItems: WalletDraftItem[] }>
+    Record<
+      string,
+      {
+        notes: string;
+        status: TaskStatus;
+        walletItems: WalletDraftItem[];
+        installments: TaskInstallmentDraft[];
+      }
+    >
   >({});
   const [taskBoard, setTaskBoard] = useState<TaskBoardLane[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -942,18 +988,29 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
         notes: task.notes,
         status: normalizeTaskStatus(task.status),
         walletItems: toWalletDraftItems(task.walletItems),
+        installments: toInstallmentDrafts(task.installments),
       },
     }));
   }
 
   function updateLeadTaskDraft(
     taskId: string,
-    patch: Partial<{ notes: string; status: TaskStatus; walletItems: WalletDraftItem[] }>
+    patch: Partial<{
+      notes: string;
+      status: TaskStatus;
+      walletItems: WalletDraftItem[];
+      installments: TaskInstallmentDraft[];
+    }>
   ) {
     setLeadTaskDrafts((current) => ({
       ...current,
       [taskId]: {
-        ...(current[taskId] ?? { notes: "", status: "in_progress", walletItems: defaultWalletItems.map((item) => ({ ...item })) }),
+        ...(current[taskId] ?? {
+          notes: "",
+          status: "in_progress",
+          walletItems: defaultWalletItems.map((item) => ({ ...item })),
+          installments: [],
+        }),
         ...patch,
       },
     }));
@@ -970,6 +1027,7 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
         notes: "",
         status: "in_progress" as TaskStatus,
         walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
       };
 
       return {
@@ -988,6 +1046,7 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
         notes: "",
         status: "in_progress" as TaskStatus,
         walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
       };
 
       return {
@@ -1009,6 +1068,7 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
         notes: "",
         status: "in_progress" as TaskStatus,
         walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
       };
       const nextWalletItems = draft.walletItems.filter((item) => item.id !== itemId);
 
@@ -1017,6 +1077,107 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
         [taskId]: {
           ...draft,
           walletItems: nextWalletItems.length > 0 ? nextWalletItems : [{ id: "wallet-primary", description: "", cost: "", revenue: "" }],
+        },
+      };
+    });
+  }
+
+  function updateLeadTaskInstallment(
+    taskId: string,
+    installmentId: string,
+    field: "amount" | "dueDate",
+    value: string
+  ) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
+      };
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          installments: draft.installments.map((item) =>
+            item.id === installmentId ? { ...item, [field]: value } : item
+          ),
+        },
+      };
+    });
+  }
+
+  function addLeadTaskInstallment(taskId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
+      };
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          installments: [
+            ...draft.installments,
+            {
+              id: `installment-${crypto.randomUUID()}`,
+              amount: "",
+              dueDate: "",
+              status: "pending" as const,
+              paidAt: null,
+            },
+          ],
+        },
+      };
+    });
+  }
+
+  function removeLeadTaskInstallment(taskId: string, installmentId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId];
+
+      if (!draft) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          installments: draft.installments.filter((item) => item.id !== installmentId),
+        },
+      };
+    });
+  }
+
+  function toggleLeadTaskInstallmentPaid(taskId: string, installmentId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId];
+
+      if (!draft) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          installments: draft.installments.map((item) => {
+            if (item.id !== installmentId) {
+              return item;
+            }
+
+            const paid = item.status !== "paid";
+            return {
+              ...item,
+              status: paid ? "paid" : "pending",
+              paidAt: paid ? new Date().toISOString() : null,
+            };
+          }),
         },
       };
     });
@@ -1040,6 +1201,7 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
                     notes: draft.notes.trim(),
                     status: draft.status,
                     walletItems: toWalletItems(draft.walletItems, task.title),
+                    installments: toInstallments(draft.installments),
                   }
                 : task
             ),
@@ -1854,6 +2016,7 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
                       notes: task.notes,
                       status: normalizeTaskStatus(task.status),
                       walletItems: toWalletDraftItems(task.walletItems),
+                      installments: toInstallmentDrafts(task.installments),
                     };
                     const isExpanded = expandedLeadTaskId === task.id;
 
@@ -1979,6 +2142,80 @@ export function LeadsShell({ embeddedLeadId, embeddedNewLeadPhone, onEmbeddedClo
                                   <strong>{getWalletTotals(draft.walletItems).marginPercent.toFixed(1)}%</strong>
                                 </div>
                               </div>
+                            </section>
+                            <section className={boardStyles.installmentPanel}>
+                              <div className={boardStyles.walletHeader}>
+                                <div>
+                                  <h3>Installments paid</h3>
+                                  <span>
+                                    {draft.installments.filter((item) => item.status === "paid").length}/
+                                    {draft.installments.length} paid · {formatMoney(
+                                      draft.installments
+                                        .filter((item) => item.status === "paid")
+                                        .reduce((total, item) => total + parseMoney(item.amount), 0)
+                                    )} of {formatMoney(
+                                      draft.installments.reduce((total, item) => total + parseMoney(item.amount), 0)
+                                    )}
+                                  </span>
+                                </div>
+                                <button type="button" onClick={() => addLeadTaskInstallment(task.id)}>
+                                  + New
+                                </button>
+                              </div>
+                              {draft.installments.length === 0 ? (
+                                <p className={boardStyles.installmentEmpty}>
+                                  No installments added for this task.
+                                </p>
+                              ) : (
+                                <div className={boardStyles.installmentEditorRows}>
+                                  {draft.installments.map((item, index) => (
+                                    <div
+                                      key={item.id}
+                                      className={`${boardStyles.installmentEditorRow} ${
+                                        item.status === "paid" ? boardStyles.installmentEditorRowPaid : ""
+                                      }`}
+                                    >
+                                      <span className={boardStyles.installmentNumber}>{index + 1}</span>
+                                      <input
+                                        inputMode="decimal"
+                                        value={item.amount}
+                                        onChange={(event) =>
+                                          updateLeadTaskInstallment(task.id, item.id, "amount", event.target.value)
+                                        }
+                                        placeholder="Amount"
+                                        aria-label={`Installment ${index + 1} amount`}
+                                      />
+                                      <input
+                                        type="date"
+                                        value={item.dueDate}
+                                        onChange={(event) =>
+                                          updateLeadTaskInstallment(task.id, item.id, "dueDate", event.target.value)
+                                        }
+                                        aria-label={`Installment ${index + 1} due date`}
+                                      />
+                                      <button
+                                        type="button"
+                                        className={
+                                          item.status === "paid"
+                                            ? boardStyles.installmentPaidButton
+                                            : boardStyles.installmentPayButton
+                                        }
+                                        onClick={() => toggleLeadTaskInstallmentPaid(task.id, item.id)}
+                                      >
+                                        {item.status === "paid" ? "Paid" : "Mark paid"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={boardStyles.installmentDeleteButton}
+                                        onClick={() => removeLeadTaskInstallment(task.id, item.id)}
+                                        aria-label={`Remove installment ${index + 1}`}
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </section>
                             <button type="button" onClick={() => void saveLeadTaskUpdate(laneId, task.id)}>
                               Save changes

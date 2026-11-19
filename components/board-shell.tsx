@@ -28,6 +28,7 @@ import {
   type LeadFileRecord,
   type LeadLogRecord,
   type LeadRecord,
+  type TaskInstallment,
   type UpdateLeadInput,
 } from "../lib/crm-api";
 import { AddressAutocomplete } from "./address-autocomplete";
@@ -56,6 +57,14 @@ type WalletDraftItem = {
   revenue: string;
 };
 
+type TaskInstallmentDraft = {
+  id: string;
+  amount: string;
+  dueDate: string;
+  status: "pending" | "paid";
+  paidAt?: string | null;
+};
+
 type Task = {
   id: string;
   title: string;
@@ -67,6 +76,7 @@ type Task = {
   status: TaskStatus;
   hidden?: boolean;
   walletItems?: WalletItem[];
+  installments?: TaskInstallment[];
 };
 
 type Lane = {
@@ -92,6 +102,7 @@ type DraftTask = {
   isCreatingLead: boolean;
   status: TaskStatus;
   walletItems: WalletDraftItem[];
+  installments: TaskInstallmentDraft[];
 };
 
 const defaultWalletItems: WalletDraftItem[] = [
@@ -112,6 +123,7 @@ const emptyTaskDraft: DraftTask = {
   isCreatingLead: false,
   status: "todo",
   walletItems: defaultWalletItems,
+  installments: [],
 };
 
 const emptyLeadEditor: UpdateLeadInput = {
@@ -287,6 +299,28 @@ function toWalletItems(items: WalletDraftItem[], fallbackTitle: string): WalletI
     .filter((item) => item.description || item.cost > 0 || item.revenue > 0);
 }
 
+function toInstallmentDrafts(items?: TaskInstallment[]) {
+  return (items ?? []).map((item) => ({
+    id: item.id,
+    amount: item.amount ? String(item.amount) : "",
+    dueDate: item.dueDate ?? "",
+    status: item.status === "paid" ? "paid" as const : "pending" as const,
+    paidAt: item.paidAt ?? null,
+  }));
+}
+
+function toInstallments(items: TaskInstallmentDraft[]): TaskInstallment[] {
+  return items
+    .map((item) => ({
+      id: item.id || `installment-${crypto.randomUUID()}`,
+      amount: parseMoney(item.amount),
+      dueDate: item.dueDate || null,
+      status: item.status === "paid" ? "paid" as const : "pending" as const,
+      paidAt: item.status === "paid" ? item.paidAt || new Date().toISOString() : null,
+    }))
+    .filter((item) => item.amount > 0 || item.dueDate);
+}
+
 function getWalletTotals(items: WalletDraftItem[] | WalletItem[]) {
   const totals = items.reduce(
     (current, item) => {
@@ -328,6 +362,7 @@ function normalizeBoard(lanes: Lane[]): Lane[] {
         status: normalizeTaskStatus(task.status),
         hidden: task.hidden === true,
         walletItems: task.walletItems ?? [],
+        installments: task.installments ?? [],
       })),
     }));
 }
@@ -365,7 +400,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
   const [collapsedLogs, setCollapsedLogs] = useState<Record<string, boolean>>({});
   const [expandedLeadTaskId, setExpandedLeadTaskId] = useState<string | null>(null);
   const [leadTaskDrafts, setLeadTaskDrafts] = useState<
-    Record<string, { notes: string; status: TaskStatus; walletItems: WalletDraftItem[] }>
+    Record<string, { notes: string; status: TaskStatus; walletItems: WalletDraftItem[]; installments: TaskInstallmentDraft[] }>
   >({});
   const [leadLogMessage, setLeadLogMessage] = useState<string | null>(null);
   const [leadWalletMessage, setLeadWalletMessage] = useState<string | null>(null);
@@ -390,6 +425,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
     leadSearch: string;
     status: TaskStatus;
     walletItems: WalletDraftItem[];
+    installments: TaskInstallmentDraft[];
   } | null>(null);
   const [draftLeadSearchResults, setDraftLeadSearchResults] = useState<LeadRecord[]>([]);
   const [editingLeadSearchResults, setEditingLeadSearchResults] = useState<LeadRecord[]>([]);
@@ -836,13 +872,14 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
         notes: task.notes,
         status: normalizeTaskStatus(task.status),
         walletItems: toWalletDraftItems(task.walletItems),
+        installments: toInstallmentDrafts(task.installments),
       },
     }));
   }
 
   function updateLeadTaskDraft(
     taskId: string,
-    patch: Partial<{ notes: string; status: TaskStatus; walletItems: WalletDraftItem[] }>
+    patch: Partial<{ notes: string; status: TaskStatus; walletItems: WalletDraftItem[]; installments: TaskInstallmentDraft[] }>
   ) {
     setLeadTaskDrafts((current) => ({
       ...current,
@@ -851,6 +888,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
           notes: "",
           status: "todo",
           walletItems: defaultWalletItems.map((item) => ({ ...item })),
+          installments: [],
         }),
         ...patch,
       },
@@ -868,6 +906,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
         notes: "",
         status: "in_progress" as TaskStatus,
         walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
       };
 
       return {
@@ -886,6 +925,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
         notes: "",
         status: "in_progress" as TaskStatus,
         walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
       };
 
       return {
@@ -907,6 +947,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
         notes: "",
         status: "in_progress" as TaskStatus,
         walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
       };
       const nextWalletItems = draft.walletItems.filter((item) => item.id !== itemId);
 
@@ -920,6 +961,63 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
               : [{ id: "wallet-primary", description: "", cost: "", revenue: "" }],
         },
       };
+    });
+  }
+
+  function updateLeadTaskInstallment(taskId: string, installmentId: string, patch: Partial<TaskInstallmentDraft>) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
+      };
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          installments: draft.installments.map((item) => item.id === installmentId ? { ...item, ...patch } : item),
+        },
+      };
+    });
+  }
+
+  function addLeadTaskInstallment(taskId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId] ?? {
+        notes: "",
+        status: "in_progress" as TaskStatus,
+        walletItems: defaultWalletItems.map((item) => ({ ...item })),
+        installments: [],
+      };
+
+      return {
+        ...current,
+        [taskId]: {
+          ...draft,
+          installments: [
+            ...draft.installments,
+            { id: `installment-${crypto.randomUUID()}`, amount: "", dueDate: "", status: "pending" as const, paidAt: null },
+          ],
+        },
+      };
+    });
+  }
+
+  function removeLeadTaskInstallment(taskId: string, installmentId: string) {
+    setLeadTaskDrafts((current) => {
+      const draft = current[taskId];
+      return draft ? { ...current, [taskId]: { ...draft, installments: draft.installments.filter((item) => item.id !== installmentId) } } : current;
+    });
+  }
+
+  function toggleLeadTaskInstallmentPaid(taskId: string, installmentId: string) {
+    const installment = leadTaskDrafts[taskId]?.installments.find((item) => item.id === installmentId);
+    if (!installment) return;
+    updateLeadTaskInstallment(taskId, installmentId, {
+      status: installment.status === "paid" ? "pending" : "paid",
+      paidAt: installment.status === "paid" ? null : new Date().toISOString(),
     });
   }
 
@@ -941,6 +1039,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
                     notes: draft.notes.trim(),
                     status: draft.status,
                     walletItems: toWalletItems(draft.walletItems, task.title),
+                    installments: toInstallments(draft.installments),
                   }
                 : task
             ),
@@ -1413,6 +1512,51 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
     });
   }
 
+  function updateDraftInstallment(laneId: string, installmentId: string, patch: Partial<TaskInstallmentDraft>) {
+    setLaneDrafts((current) => {
+      const draft = current[laneId] ?? emptyTaskDraft;
+      return {
+        ...current,
+        [laneId]: {
+          ...draft,
+          installments: draft.installments.map((item) => item.id === installmentId ? { ...item, ...patch } : item),
+        },
+      };
+    });
+  }
+
+  function addDraftInstallment(laneId: string) {
+    setLaneDrafts((current) => {
+      const draft = current[laneId] ?? emptyTaskDraft;
+      return {
+        ...current,
+        [laneId]: {
+          ...draft,
+          installments: [
+            ...draft.installments,
+            { id: `installment-${crypto.randomUUID()}`, amount: "", dueDate: "", status: "pending", paidAt: null },
+          ],
+        },
+      };
+    });
+  }
+
+  function removeDraftInstallment(laneId: string, installmentId: string) {
+    setLaneDrafts((current) => {
+      const draft = current[laneId] ?? emptyTaskDraft;
+      return { ...current, [laneId]: { ...draft, installments: draft.installments.filter((item) => item.id !== installmentId) } };
+    });
+  }
+
+  function toggleDraftInstallmentPaid(laneId: string, installmentId: string) {
+    const installment = laneDrafts[laneId]?.installments.find((item) => item.id === installmentId);
+    if (!installment) return;
+    updateDraftInstallment(laneId, installmentId, {
+      status: installment.status === "paid" ? "pending" : "paid",
+      paidAt: installment.status === "paid" ? null : new Date().toISOString(),
+    });
+  }
+
   async function createLeadForDraft(laneId: string) {
     const draft = laneDrafts[laneId] ?? emptyTaskDraft;
     const { firstName, lastName } = splitLeadName(draft.newLeadName);
@@ -1538,6 +1682,39 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
     });
   }
 
+  function updateEditingInstallment(installmentId: string, patch: Partial<TaskInstallmentDraft>) {
+    setEditingTask((current) => current ? {
+      ...current,
+      installments: current.installments.map((item) => item.id === installmentId ? { ...item, ...patch } : item),
+    } : current);
+  }
+
+  function addEditingInstallment() {
+    setEditingTask((current) => current ? {
+      ...current,
+      installments: [
+        ...current.installments,
+        { id: `installment-${crypto.randomUUID()}`, amount: "", dueDate: "", status: "pending", paidAt: null },
+      ],
+    } : current);
+  }
+
+  function removeEditingInstallment(installmentId: string) {
+    setEditingTask((current) => current ? {
+      ...current,
+      installments: current.installments.filter((item) => item.id !== installmentId),
+    } : current);
+  }
+
+  function toggleEditingInstallmentPaid(installmentId: string) {
+    const installment = editingTask?.installments.find((item) => item.id === installmentId);
+    if (!installment) return;
+    updateEditingInstallment(installmentId, {
+      status: installment.status === "paid" ? "pending" : "paid",
+      paidAt: installment.status === "paid" ? null : new Date().toISOString(),
+    });
+  }
+
   function attachLeadToEditing(lead: LeadRecord) {
     setEditingTask((current) =>
       current
@@ -1596,6 +1773,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
       leadName: leadName || null,
       status: draft.status,
       walletItems,
+      installments: toInstallments(draft.installments),
     };
     const nextLanes = lanes.map((lane) =>
       lane.id === laneId
@@ -1631,6 +1809,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
       leadSearch: getTaskLeadName(task),
       status: normalizeTaskStatus(task.status),
       walletItems: toWalletDraftItems(task.walletItems),
+      installments: toInstallmentDrafts(task.installments),
     });
   }
 
@@ -1652,6 +1831,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
                     leadName: editingTask.leadId ? getLeadName(editingTask.leadId) || editingTask.leadSearch : null,
                     status: editingTask.status,
                     walletItems: toWalletItems(editingTask.walletItems, editingTask.title.trim()),
+                    installments: toInstallments(editingTask.installments),
                   }
                 : taskItem
             ),
@@ -1956,6 +2136,63 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
     );
   }
 
+  function renderInstallmentEditor({
+    items,
+    onAdd,
+    onUpdate,
+    onRemove,
+    onTogglePaid,
+  }: {
+    items: TaskInstallmentDraft[];
+    onAdd: () => void;
+    onUpdate: (id: string, patch: Partial<TaskInstallmentDraft>) => void;
+    onRemove: (id: string) => void;
+    onTogglePaid: (id: string) => void;
+  }) {
+    const paidCount = items.filter((item) => item.status === "paid").length;
+    const paidTotal = items.filter((item) => item.status === "paid").reduce((sum, item) => sum + parseMoney(item.amount), 0);
+    const total = items.reduce((sum, item) => sum + parseMoney(item.amount), 0);
+
+    return (
+      <section className={styles.installmentPanel}>
+        <div className={styles.walletHeader}>
+          <div>
+            <h3>Installments paid</h3>
+            <small>{paidCount}/{items.length} paid · {formatMoney(paidTotal)} of {formatMoney(total)}</small>
+          </div>
+          <button type="button" onClick={onAdd}>+ New</button>
+        </div>
+        <div className={styles.installmentEditorRows}>
+          {items.map((item, index) => (
+            <div key={item.id} className={`${styles.installmentEditorRow} ${item.status === "paid" ? styles.installmentEditorRowPaid : ""}`}>
+              <span className={styles.installmentNumber}>{index + 1}</span>
+              <input
+                inputMode="decimal"
+                value={item.amount}
+                onChange={(event) => onUpdate(item.id, { amount: event.target.value })}
+                placeholder="Amount"
+                aria-label={`Installment ${index + 1} amount`}
+              />
+              <input
+                type="date"
+                value={item.dueDate}
+                onChange={(event) => onUpdate(item.id, { dueDate: event.target.value })}
+                aria-label={`Installment ${index + 1} date`}
+              />
+              <button type="button" className={item.status === "paid" ? styles.installmentPaidButton : styles.installmentPayButton} onClick={() => onTogglePaid(item.id)}>
+                {item.status === "paid" ? "Paid" : "Mark paid"}
+              </button>
+              <button type="button" className={styles.installmentDeleteButton} onClick={() => onRemove(item.id)} aria-label={`Delete installment ${index + 1}`}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          {items.length === 0 ? <p className={styles.installmentEmpty}>No installments added yet.</p> : null}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <main className={`${styles.page} ${embeddedLaneId || embeddedLeadId ? styles.embeddedPage : ""}`}>
       <header className={styles.header}>
@@ -2168,6 +2405,14 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
                             </div>
                             <strong className={styles.taskTitle}>{task.title}</strong>
                             {task.notes ? <p className={styles.taskDescriptionCard}>{task.notes}</p> : null}
+                            {task.installments?.length ? (
+                              <div className={styles.taskInstallmentSummary}>
+                                <span>Installments</span>
+                                <strong>
+                                  {task.installments.filter((item) => item.status === "paid").length}/{task.installments.length} paid · {formatMoney(task.installments.reduce((sum, item) => sum + Number(item.amount || 0), 0))}
+                                </strong>
+                              </div>
+                            ) : null}
                             {attachedLeadName ? (
                               <button
                                 type="button"
@@ -2417,6 +2662,14 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
               onRemove: (itemId) => removeDraftWalletItem(activeTaskModalLaneId, itemId),
             })}
 
+            {renderInstallmentEditor({
+              items: laneDrafts[activeTaskModalLaneId]?.installments ?? [],
+              onAdd: () => addDraftInstallment(activeTaskModalLaneId),
+              onUpdate: (id, patch) => updateDraftInstallment(activeTaskModalLaneId, id, patch),
+              onRemove: (id) => removeDraftInstallment(activeTaskModalLaneId, id),
+              onTogglePaid: (id) => toggleDraftInstallmentPaid(activeTaskModalLaneId, id),
+            })}
+
             <button
               type="button"
               className={styles.addTaskButton}
@@ -2581,6 +2834,14 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
               onUpdate: updateEditingWalletItem,
               onAdd: addEditingWalletItem,
               onRemove: removeEditingWalletItem,
+            })}
+
+            {renderInstallmentEditor({
+              items: editingTask.installments,
+              onAdd: addEditingInstallment,
+              onUpdate: updateEditingInstallment,
+              onRemove: removeEditingInstallment,
+              onTogglePaid: toggleEditingInstallmentPaid,
             })}
 
             <div className={styles.modalActionRow}>
@@ -3000,6 +3261,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
                       notes: task.notes,
                       status: normalizeTaskStatus(task.status),
                       walletItems: toWalletDraftItems(task.walletItems),
+                      installments: toInstallmentDrafts(task.installments),
                     };
                     const isExpanded = expandedLeadTaskId === task.id;
 
@@ -3069,6 +3331,13 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
                                 updateLeadTaskWalletItem(task.id, itemId, field, value),
                               onAdd: () => addLeadTaskWalletItem(task.id),
                               onRemove: (itemId) => removeLeadTaskWalletItem(task.id, itemId),
+                            })}
+                            {renderInstallmentEditor({
+                              items: draft.installments,
+                              onAdd: () => addLeadTaskInstallment(task.id),
+                              onUpdate: (id, patch) => updateLeadTaskInstallment(task.id, id, patch),
+                              onRemove: (id) => removeLeadTaskInstallment(task.id, id),
+                              onTogglePaid: (id) => toggleLeadTaskInstallmentPaid(task.id, id),
                             })}
                             <button type="button" onClick={() => saveLeadTaskUpdate(laneId, task.id)}>
                               Save changes

@@ -122,6 +122,14 @@ export function LeadWalletPanel({
         .reduce((installmentSum, installment) => installmentSum + parseMoney(installment.amount), 0),
     0
   );
+  const serviceRows = tasks.flatMap((task) =>
+    (task.walletItems ?? []).map((item) => ({
+      taskTitle: task.title,
+      description: item.description || task.title,
+      cost: parseMoney(item.cost),
+      revenue: parseMoney(item.revenue),
+    }))
+  );
 
   return (
     <section className={styles.walletLeadSection}>
@@ -156,6 +164,36 @@ export function LeadWalletPanel({
           <span>Overdue</span>
           <strong>{formatMoney(totalOverdue)}</strong>
         </article>
+      </div>
+
+      <div className={styles.serviceCostSection}>
+        <div className={styles.serviceCostHeader}>
+          <div>
+            <h4>Service costs by task</h4>
+            <p>Each service is linked to its task instead of showing only one combined amount.</p>
+          </div>
+        </div>
+        {serviceRows.length > 0 ? (
+          <div className={styles.serviceCostList}>
+            <div className={styles.serviceCostColumns}>
+              <span>Service / task</span>
+              <span>Cost</span>
+              <span>Revenue</span>
+            </div>
+            {serviceRows.map((row, index) => (
+              <div key={`${row.taskTitle}-${row.description}-${index}`} className={styles.serviceCostRow}>
+                <div>
+                  <strong>{row.description}</strong>
+                  <span>{row.taskTitle}</span>
+                </div>
+                <span>{formatMoney(row.cost)}</span>
+                <strong>{formatMoney(row.revenue)}</strong>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.leadEmptyState}>No service costs linked to tasks yet.</p>
+        )}
       </div>
 
       {message ? <p className={styles.walletSectionMessage}>{message}</p> : null}
