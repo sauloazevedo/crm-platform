@@ -1707,3 +1707,8 @@
   color: #263440;
   box-shadow: 0 18px 50px rgba(25, 52, 66, .24);
 }
+
+.embeddedPage { visibility: hidden; }
+.embeddedPage [data-embedded-task-modal="true"] { visibility: visible; }
+.embeddedLaneSelect { display: grid; gap: 6px; margin: 0 0 12px; color: #536673; font-size: .72rem; font-weight: 700; }
+.embeddedLaneSelect select { min-height: 36px; padding: 0 10px; border: 1px solid #bfced6; border-radius: 7px; background: #fff; color: #263440; }

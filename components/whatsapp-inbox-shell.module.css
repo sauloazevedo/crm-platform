@@ -23,5 +23,6 @@
 .responsibleDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--responsible-color, #168aaf); }
 .responsibleUserLine { display: inline-flex; align-items: center; gap: 7px; }
 .responsibleUserLine .responsibleDot { flex: 0 0 auto; }
+.channelTabs .tab { display: none; }
 .mediaLeadName { display: block; margin-top: 5px; color: #526d79; font-size: .63rem; font-weight: 600; }
 .mediaSaveError { display: block; margin-top: 3px; color: #a3372f; font-size: .62rem; }

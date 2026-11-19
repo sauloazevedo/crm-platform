@@ -336,7 +336,15 @@ function isDoneLaneTitle(title: string) {
   return title.trim().toLowerCase() === "done";
 }
 
-export function BoardShell() {
+type BoardShellProps = {
+  embeddedLaneId?: string | null;
+  embeddedLeadId?: string | null;
+  embeddedLeadName?: string | null;
+  onEmbeddedClose?: () => void;
+  onEmbeddedCreated?: (task: Task) => void;
+};
+
+export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, onEmbeddedClose, onEmbeddedCreated }: BoardShellProps = {}) {
   const auth = useAuth();
   const [lanes, setLanes] = useState<Lane[]>([]);
   const [leads, setLeads] = useState<LeadRecord[]>([]);
@@ -432,6 +440,20 @@ export function BoardShell() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if ((!embeddedLaneId && !embeddedLeadId) || lanes.length === 0 || activeTaskModalLaneId) return;
+    const laneId = embeddedLaneId && lanes.some((lane) => lane.id === embeddedLaneId) ? embeddedLaneId : lanes[0].id;
+    setLaneDrafts((current) => ({
+      ...current,
+      [laneId]: {
+        ...(current[laneId] ?? emptyTaskDraft),
+        leadId: embeddedLeadId || "",
+        leadSearch: embeddedLeadName || "",
+      },
+    }));
+    setActiveTaskModalLaneId(laneId);
+  }, [activeTaskModalLaneId, embeddedLaneId, embeddedLeadId, embeddedLeadName, lanes]);
 
   useEffect(() => {
     const query = (activeTaskModalLaneId ? laneDrafts[activeTaskModalLaneId]?.leadSearch : "").trim();
@@ -1453,6 +1475,14 @@ export function BoardShell() {
 
   function closeTaskModal() {
     setActiveTaskModalLaneId(null);
+    onEmbeddedClose?.();
+  }
+
+  function switchEmbeddedLane(laneId: string) {
+    if (!activeTaskModalLaneId || laneId === activeTaskModalLaneId) return;
+    const currentDraft = laneDrafts[activeTaskModalLaneId] ?? emptyTaskDraft;
+    setLaneDrafts((current) => ({ ...current, [laneId]: { ...currentDraft } }));
+    setActiveTaskModalLaneId(laneId);
   }
 
   function closeTaskEditModal() {
@@ -1556,24 +1586,22 @@ export function BoardShell() {
     if (!title) return;
     if (draft.leadSearch.trim() && !draft.leadId) return;
 
+    const newTask: Task = {
+      id: `task-${crypto.randomUUID()}`,
+      title,
+      createdAt: draft.createdAt || getTodayDate(),
+      notes,
+      leadId: draft.leadId || null,
+      leadSearch: leadName || "",
+      leadName: leadName || null,
+      status: draft.status,
+      walletItems,
+    };
     const nextLanes = lanes.map((lane) =>
       lane.id === laneId
         ? {
             ...lane,
-            tasks: [
-              ...lane.tasks,
-              {
-                id: `task-${crypto.randomUUID()}`,
-                title,
-                createdAt: draft.createdAt || getTodayDate(),
-                notes,
-                leadId: draft.leadId || null,
-                leadSearch: leadName || "",
-                leadName: leadName || null,
-                status: draft.status,
-                walletItems,
-              },
-            ],
+            tasks: [...lane.tasks, newTask],
           }
         : lane
     );
@@ -1584,6 +1612,8 @@ export function BoardShell() {
       [laneId]: emptyTaskDraft,
     }));
     setActiveTaskModalLaneId(null);
+    onEmbeddedCreated?.(newTask);
+    onEmbeddedClose?.();
   }
 
   function startEditingTask(laneId: string, taskId: string) {
@@ -1927,7 +1957,7 @@ export function BoardShell() {
   }
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${embeddedLaneId || embeddedLeadId ? styles.embeddedPage : ""}`}>
       <header className={styles.header}>
         <div>
           <p className={styles.boardTitle}>CRM Workflow Board</p>
@@ -2207,7 +2237,7 @@ export function BoardShell() {
       </section>
 
       {activeTaskModalLaneId ? (
-        <div className={styles.modalOverlay} onClick={closeTaskModal}>
+        <div className={styles.modalOverlay} data-embedded-task-modal="true" onClick={closeTaskModal}>
           <aside className={styles.taskModal} onClick={(event) => event.stopPropagation()}>
             <div className={styles.modalHeader}>
               <div>
@@ -2218,6 +2248,15 @@ export function BoardShell() {
                 Close
               </button>
             </div>
+
+            {embeddedLeadId ? (
+              <label className={styles.embeddedLaneSelect}>
+                <span>Column</span>
+                <select value={activeTaskModalLaneId} onChange={(event) => switchEmbeddedLane(event.target.value)}>
+                  {lanes.map((lane) => <option key={lane.id} value={lane.id}>{lane.title}</option>)}
+                </select>
+              </label>
+            ) : null}
 
             <label>
               <span>New task title</span>
