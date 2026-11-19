@@ -1591,3 +1591,10 @@
   width: 100%;
   font-size: 1.35rem;
 }
+
+:global(html[data-theme="clean"]) .dragLaneButton:hover,
+:global(html[data-theme="clean"]) .laneIconButton:hover {
+  border-color: #168aaf;
+  background: #e3f3f6;
+  color: #294b5a;
+}
