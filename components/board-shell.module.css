@@ -1598,3 +1598,112 @@
   background: #e3f3f6;
   color: #294b5a;
 }
+
+:global(html[data-theme="clean"]) .page {
+  padding: 8px 10px;
+  gap: 8px;
+  background: #edf5f8;
+  color: #263440;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+:global(html[data-theme="clean"]) .header {
+  min-height: 52px;
+  padding: 10px 16px;
+  border: 1px solid #dbe4e8;
+  border-radius: 4px;
+  background: #fff;
+}
+
+:global(html[data-theme="clean"]) .eyebrow,
+:global(html[data-theme="clean"]) .boardTitle { color: #0b76a8; }
+:global(html[data-theme="clean"]) .boardStatus,
+:global(html[data-theme="clean"]) .copy { color: #6d7e88; }
+
+:global(html[data-theme="clean"]) .secondaryAction,
+:global(html[data-theme="clean"]) .deleteLaneButton,
+:global(html[data-theme="clean"]) .taskActions button {
+  border: 1px solid #bfcfd7;
+  border-radius: 4px;
+  background: #fff;
+  color: #344b58;
+}
+
+:global(html[data-theme="clean"]) .secondaryAction:hover,
+:global(html[data-theme="clean"]) .deleteLaneButton:hover,
+:global(html[data-theme="clean"]) .taskActions button:hover {
+  border-color: #168aaf;
+  background: #edf7fa;
+  color: #0b76a8;
+}
+
+:global(html[data-theme="clean"]) .addLaneBox input,
+:global(html[data-theme="clean"]) .laneTitle,
+:global(html[data-theme="clean"]) .newTaskComposer input,
+:global(html[data-theme="clean"]) .newTaskComposer textarea,
+:global(html[data-theme="clean"]) .taskModal input,
+:global(html[data-theme="clean"]) .taskModal select,
+:global(html[data-theme="clean"]) .taskModal textarea,
+:global(html[data-theme="clean"]) .taskEditModal input,
+:global(html[data-theme="clean"]) .taskEditModal select,
+:global(html[data-theme="clean"]) .taskEditModal textarea,
+:global(html[data-theme="clean"]) .taskEditor input,
+:global(html[data-theme="clean"]) .taskEditor select,
+:global(html[data-theme="clean"]) .taskEditor textarea {
+  border-color: #bfced6;
+  border-radius: 4px;
+  background: #fff;
+  color: #263440;
+}
+
+:global(html[data-theme="clean"]) .lane {
+  padding: 12px;
+  gap: 10px;
+  border: 1px solid #d5e1e6;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(45, 74, 91, .08);
+}
+
+:global(html[data-theme="clean"]) .dragLaneButton,
+:global(html[data-theme="clean"]) .laneIconButton {
+  border-color: #c7d9df;
+  border-radius: 4px;
+  background: #f4fafb;
+  color: #168aaf;
+}
+
+:global(html[data-theme="clean"]) .laneColorPopover {
+  border-color: #c7d5db;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(35, 61, 73, .12);
+}
+
+:global(html[data-theme="clean"]) .taskCard,
+:global(html[data-theme="clean"]) .walletPanel {
+  border-color: #d4e0e4;
+  border-radius: 4px;
+  background: #fff;
+  color: #263440;
+  box-shadow: 0 1px 3px rgba(48, 76, 88, .06);
+}
+
+:global(html[data-theme="clean"]) .taskTitle,
+:global(html[data-theme="clean"]) .taskCard strong { color: #263440; }
+:global(html[data-theme="clean"]) .taskCard p,
+:global(html[data-theme="clean"]) .laneMetaRow span { color: #607381; }
+:global(html[data-theme="clean"]) .taskDescriptionCard,
+:global(html[data-theme="clean"]) .laneMetaRow,
+:global(html[data-theme="clean"]) .createLeadInline { background: #f7fbfc; border-color: #dbe4e8; }
+
+:global(html[data-theme="clean"]) .modalOverlay { background: rgba(24, 45, 56, .32); }
+:global(html[data-theme="clean"]) .taskModal,
+:global(html[data-theme="clean"]) .taskSearchModal,
+:global(html[data-theme="clean"]) .taskEditModal {
+  border: 1px solid #c7d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #263440;
+  box-shadow: 0 18px 50px rgba(25, 52, 66, .24);
+}
