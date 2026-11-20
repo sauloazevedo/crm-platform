@@ -2195,6 +2195,11 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
 
   return (
     <main className={`${styles.page} ${embeddedLaneId || embeddedLeadId ? styles.embeddedPage : ""}`}>
+      <nav className={styles.globalNav} aria-label="Primary navigation">
+        <Link href="/dashboard" className={styles.dashboardNavButton}>
+          Dashboard
+        </Link>
+      </nav>
       <header className={styles.header}>
         <div>
           <p className={styles.boardTitle}>CRM Workflow Board</p>
@@ -2204,14 +2209,9 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
         </div>
 
         <div className={styles.headerActions}>
-          <div className={styles.navActions}>
-            <Link href="/dashboard" className={styles.secondaryAction}>
-              Dashboard
-            </Link>
-            <Link href="/leads" className={styles.addTaskButton}>
-              New lead
-            </Link>
-          </div>
+          <Link href="/leads" className={styles.addTaskButton}>
+            New lead
+          </Link>
           <div className={styles.laneActions}>
             <label htmlFor="new-lane-title">Add workflow lane</label>
             <div className={styles.addLaneBox}>
@@ -2404,7 +2404,6 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
                               </div>
                             </div>
                             <strong className={styles.taskTitle}>{task.title}</strong>
-                            {task.notes ? <p className={styles.taskDescriptionCard}>{task.notes}</p> : null}
                             {task.installments?.length ? (
                               <div className={styles.taskInstallmentSummary}>
                                 <span>Installments</span>

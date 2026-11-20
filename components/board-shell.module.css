@@ -5,13 +5,41 @@
   box-sizing: border-box;
   padding: 14px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 12px;
   overflow: hidden;
 }
 
 .page > * {
   min-width: 0;
+}
+
+.globalNav {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+.dashboardNavButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.dashboardNavButton:hover {
+  border-color: rgba(75, 242, 226, 0.32);
+  background: rgba(75, 242, 226, 0.1);
+  color: var(--accent-cool);
+  transform: translateY(-1px);
 }
 
 .header {
@@ -1742,11 +1770,6 @@
   .headerActions,
   .addLaneBox {
     width: 100%;
-  }
-
-  .navActions {
-    width: 100%;
-    flex-direction: column;
   }
 
   .addLaneBox {
