@@ -205,6 +205,27 @@ export type TaskBoardLane = {
   tasks: TaskBoardTask[];
 };
 
+export type FinancialEntryKind = "fixed_cost" | "variable_cost" | "revenue";
+
+export type FinancialEntry = {
+  id: string;
+  kind: FinancialEntryKind;
+  description: string;
+  amount: number;
+  entryDate: string | null;
+  notes: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TaskFinancialSummary = {
+  taskId: string;
+  taskTitle: string;
+  cost: number;
+  revenue: number;
+  services: Array<{ description: string; cost: number; revenue: number }>;
+};
+
 export type CurrentUserProfile = {
   id: string;
   email: string | null;
@@ -1096,6 +1117,38 @@ export async function saveTaskBoard(lanes: TaskBoardLane[]): Promise<{ lanes: Ta
 
   if (!response.ok) {
     throw new Error(await readApiError(response, `Failed to save task board: ${response.status}`));
+  }
+
+  return response.json();
+}
+
+export async function getFinancialHealth(): Promise<{
+  entries: FinancialEntry[];
+  taskFinancials: TaskFinancialSummary[];
+}> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+  const response = await fetch(`${getApiBaseUrl()}/financial-health`, {
+    method: "GET",
+    headers: headers ?? { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch financial health: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function saveFinancialHealth(entries: FinancialEntry[]): Promise<{ entries: FinancialEntry[] }> {
+  const headers = await getAuthHeaders({ includeJsonContentType: true });
+  const response = await fetch(`${getApiBaseUrl()}/financial-health`, {
+    method: "PUT",
+    headers: headers ?? { "Content-Type": "application/json" },
+    body: JSON.stringify({ entries }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, `Failed to save financial health: ${response.status}`));
   }
 
   return response.json();

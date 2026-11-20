@@ -31,6 +31,12 @@ const tools = [
     status: "Coming soon",
   },
   {
+    name: "Financial Health",
+    href: "/financial-health",
+    description: "Track fixed costs, variable costs, task revenue, and your net result.",
+    status: "New",
+  },
+  {
     name: "Smart Blog",
     href: "/blog",
     description: "Write, review, and publish articles for Smart Tax Returns.",
