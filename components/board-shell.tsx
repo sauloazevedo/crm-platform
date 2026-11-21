@@ -236,6 +236,24 @@ function getTaskStatusLabel(status: TaskStatus) {
   return "In progress";
 }
 
+function formatTaskCreatedDate(value?: string | null) {
+  if (!value) {
+    return "No date";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "No date";
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 function getLeadInitials(name: string) {
   return name
     .split(" ")
@@ -410,6 +428,7 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
   const [boardMessage, setBoardMessage] = useState<string | null>(null);
   const [laneColors, setLaneColors] = useState<Record<string, LaneColorSettings>>(getInitialLaneColors);
   const [activeLaneColorId, setActiveLaneColorId] = useState<string | null>(null);
+  const [openTaskMenuId, setOpenTaskMenuId] = useState<string | null>(null);
   const [draggedLaneId, setDraggedLaneId] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<{
     laneId: string;
@@ -2391,41 +2410,19 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
                         }}
                       >
                         <>
-                            <div className={styles.taskHeader}>
-                              <div className={styles.taskActions}>
-                                <button type="button" onClick={() => startEditingTask(lane.id, task.id)}>
-                                  <Pencil size={12} strokeWidth={2} aria-hidden="true" />
-                                  <span className={styles.srOnly}>Edit task</span>
-                                </button>
-                                <button type="button" onClick={() => deleteTask(lane.id, task.id)}>
-                                  <Trash2 size={12} strokeWidth={2} aria-hidden="true" />
-                                  <span className={styles.srOnly}>Delete task</span>
-                                </button>
-                              </div>
-                            </div>
                             <strong className={styles.taskTitle}>{task.title}</strong>
-                            {task.installments?.length ? (
-                              <div className={styles.taskInstallmentSummary}>
-                                <span>Installments</span>
-                                <strong>
-                                  {task.installments.filter((item) => item.status === "paid").length}/{task.installments.length} paid · {formatMoney(task.installments.reduce((sum, item) => sum + Number(item.amount || 0), 0))}
-                                </strong>
-                              </div>
-                            ) : null}
                             {attachedLeadName ? (
-                              <button
-                                type="button"
-                                className={`${styles.attachedLeadCard} ${
-                                  attachedLead ? styles.attachedLeadButton : ""
-                                }`}
-                                onClick={() => {
-                                  if (attachedLead) {
-                                    void openLeadEditor(attachedLead);
-                                  }
-                                }}
-                                disabled={!attachedLead}
-                              >
-                                <div className={styles.attachedLeadTopline}>
+                              <div className={styles.attachedLeadCard}>
+                                <button
+                                  type="button"
+                                  className={`${styles.attachedLeadButton} ${styles.attachedLeadMain}`}
+                                  onClick={() => {
+                                    if (attachedLead) {
+                                      void openLeadEditor(attachedLead);
+                                    }
+                                  }}
+                                  disabled={!attachedLead}
+                                >
                                   <span className={styles.leadAvatar}>
                                     {attachedLead?.leadPhotoDataUrl ? (
                                       <img src={attachedLead.leadPhotoDataUrl} alt={attachedLeadName} />
@@ -2433,43 +2430,81 @@ export function BoardShell({ embeddedLaneId, embeddedLeadId, embeddedLeadName, o
                                       attachedLeadInitials
                                     )}
                                   </span>
-                                  <div>
+                                  <span className={styles.attachedLeadDetails}>
                                     <strong>{attachedLeadName}</strong>
                                     <small>Attached lead</small>
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.taskOverflowButton}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setOpenTaskMenuId((current) => (current === task.id ? null : task.id));
+                                  }}
+                                  aria-label="Task options"
+                                  title="Task options"
+                                >
+                                  <MoreVertical size={16} strokeWidth={2.4} aria-hidden="true" />
+                                </button>
+                                {openTaskMenuId === task.id ? (
+                                  <div className={styles.taskOverflowMenu} onClick={(event) => event.stopPropagation()}>
+                                    {task.status === "done" ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          hideTask(lane.id, task.id);
+                                          setOpenTaskMenuId(null);
+                                        }}
+                                      >
+                                        Hide task
+                                      </button>
+                                    ) : null}
                                   </div>
-                                  <MoreVertical size={12} strokeWidth={2.4} aria-hidden="true" />
-                                </div>
-                              </button>
+                                ) : null}
+                              </div>
                             ) : null}
-                            <label
-                              className={`${styles.taskStatusControl} ${
-                                task.status === "done" ? styles.taskStatusDone : styles.taskStatusInProgress
-                              }`}
-                            >
-                              <select
-                                aria-label="Task status"
-                                value={task.status}
-                                onChange={(event) =>
-                                  changeTaskStatus(
-                                    lane.id,
-                                    task.id,
-                                    event.target.value === "done" ? "done" : "in_progress"
-                                  )
-                                }
-                              >
-                                <option value="in_progress">In progress</option>
-                                <option value="done">Done</option>
-                              </select>
-                            </label>
-                            {task.status === "done" ? (
-                              <button
-                                type="button"
-                                className={styles.hideTaskButton}
-                                onClick={() => hideTask(lane.id, task.id)}
-                              >
-                                Hide
-                              </button>
+                            {task.installments?.length ? (
+                              <div className={styles.taskInstallmentSummary}>
+                                <span>Installments</span>
+                                <strong>
+                                  {task.installments.filter((item) => item.status === "paid").length}/{task.installments.length} paid - {formatMoney(task.installments.filter((item) => item.status === "paid").reduce((sum, item) => sum + Number(item.amount || 0), 0))}
+                                </strong>
+                              </div>
                             ) : null}
+                            <div className={styles.taskFooter}>
+                              <div className={styles.taskFooterActions}>
+                                <button type="button" className={styles.taskIconAction} onClick={() => deleteTask(lane.id, task.id)} aria-label="Delete task" title="Delete task">
+                                  <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
+                                </button>
+                                <button type="button" className={styles.taskIconAction} onClick={() => startEditingTask(lane.id, task.id)} aria-label="Edit task" title="Edit task">
+                                  <Pencil size={16} strokeWidth={2} aria-hidden="true" />
+                                </button>
+                                <label
+                                  className={`${styles.taskStatusControl} ${
+                                    task.status === "done" ? styles.taskStatusDone : styles.taskStatusInProgress
+                                  }`}
+                                >
+                                  <select
+                                    aria-label="Task status"
+                                    value={task.status}
+                                    onChange={(event) =>
+                                      changeTaskStatus(
+                                        lane.id,
+                                        task.id,
+                                        event.target.value === "done" ? "done" : "in_progress"
+                                      )
+                                    }
+                                  >
+                                    <option value="in_progress">In progress</option>
+                                    <option value="done">Done</option>
+                                  </select>
+                                </label>
+                              </div>
+                              <time className={styles.taskCreatedDate} dateTime={task.createdAt ?? undefined}>
+                                {formatTaskCreatedDate(task.createdAt)}
+                              </time>
+                            </div>
                         </>
                       </div>
                     );
