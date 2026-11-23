@@ -221,6 +221,7 @@ export type FinancialEntry = {
 export type TaskFinancialSummary = {
   taskId: string;
   taskTitle: string;
+  taskDate: string | null;
   cost: number;
   revenue: number;
   services: Array<{ description: string; cost: number; revenue: number }>;
